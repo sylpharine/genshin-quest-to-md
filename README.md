@@ -121,7 +121,7 @@ def render(doc, options) -> str:
 
 ## 项目结构
 ```text
-src/genshhin_json_to_md/
+src/json_to_md/
   cli.py            # CLI 入口与参数解析
   config.py         # 全局配置与默认模板
   placeholders.py   # 占位符与性别替换
