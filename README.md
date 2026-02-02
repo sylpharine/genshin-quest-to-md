@@ -35,6 +35,7 @@ python3 json2md.py "在岩间.json" -o "在岩间.md"
 - `--filter-keyword`：仅输出包含关键词的对话（可重复）
 - `--exclude-keyword`：排除包含关键词的对话（可重复）
 - `--filter-task`：仅输出任务标题包含关键词的任务（可重复）
+- `--filter-id`：仅输出匹配指定 ID 前缀的内容（可重复）
 
 ## 示例
 ```bash
@@ -75,8 +76,15 @@ python3 json2md.py "在云间.json" -o "在云间.md" --filter-task "前往"
 - `black_screen`
 
 模板可用变量示例：`{chapter_num}`, `{chapter_title}`, `{task_title}`, `{role}`, `{text}`, `{index}`。
+ID 模板可用变量：`{story_id}`, `{task_id}`, `{dialog_id}`。
 你可以通过 `options.skip_fields` 禁用指定字段渲染，或将模板值设为空字符串。
-你也可以在 `options` 中配置过滤器：`filter_roles` / `exclude_roles` / `filter_keywords` / `exclude_keywords` / `filter_tasks`。
+你也可以在 `options` 中配置过滤器：`filter_roles` / `exclude_roles` / `filter_keywords` / `exclude_keywords` / `filter_tasks` / `filter_ids`。
+
+ID 相关说明：
+- `story_id`（如 40223）、`task_id`（如 4022302）、`dialog_id`（如 402230201）
+- 默认在 `skip_fields` 中不渲染
+- `filter_ids` 支持前缀匹配与范围匹配（如 `402220201-402220230`）
+- 范围匹配会按范围端点的位数对目标 ID 前缀进行比较（例如 `40223-40224` 会匹配 `4022301`）
 
 ### 渲染器模式（renderer）
 `format_examples/renderer.novel.json` 指定了一个 Python 渲染器：

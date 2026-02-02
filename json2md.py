@@ -17,8 +17,11 @@ BRANCH_DEFAULT = 1
 DEFAULT_TEMPLATES = {
     "chapter_title": "# {chapter_num} 《{chapter_title}》",
     "chapter_desc": "{chapter_desc}",
+    "story_id": "StoryID: {story_id}",
+    "task_id": "TaskID: {task_id}",
     "task_title": "## {task_title}",
     "task_desc": "{task_desc}",
+    "dialog_id": "DialogID: {dialog_id}",
     "dialog_line": "{role}：{text}",
     "dialog_cont": "    {text}",
     "branch_label": "【分支{index}】",
@@ -200,6 +203,7 @@ def _build_dialog_nodes(task: Dict[str, Any]) -> List[Dict[str, Any]]:
         def _dialog_node(text_value: str) -> Dict[str, Any]:
             return {
                 "type": "dialog",
+                "id": current,
                 "role": role,
                 "text": text_value,
                 "is_black_screen": is_black_screen,
@@ -308,12 +312,16 @@ def _render_nodes_with_templates(
 
         role = node.get("role", "")
         text = node.get("text", "")
+        dialog_id = node.get("id", "")
         is_black = bool(node.get("is_black_screen", False))
         if is_black:
             if _tpl("black_screen"):
                 lines.append(f"{prefix}{_tpl('black_screen').format(text=text)}")
             last_was_dialog = False
             continue
+
+        if dialog_id and _tpl("dialog_id"):
+            lines.append(f"{prefix}{_tpl('dialog_id').format(dialog_id=dialog_id)}")
 
         if last_was_dialog and role == last_role and indent_level == last_indent:
             if _tpl("dialog_cont"):
@@ -364,6 +372,12 @@ def _render_with_templates(doc: Dict[str, Any], config: Dict[str, Any]) -> str:
         lines.append(_tpl("chapter_desc").format(chapter_desc=chapter_desc))
 
     for task in doc.get("tasks", []):
+        story_id = task.get("story_id", "")
+        task_id = task.get("task_id", "")
+        if story_id and _tpl("story_id"):
+            lines.append(_tpl("story_id").format(story_id=story_id))
+        if task_id and _tpl("task_id"):
+            lines.append(_tpl("task_id").format(task_id=task_id))
         title = task.get("title") or ""
         if title and _tpl("task_title"):
             lines.append("")
@@ -420,17 +434,73 @@ def _filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
     keyword_include = options.get("filter_keywords", []) or []
     keyword_exclude = options.get("exclude_keywords", []) or []
     task_filters = options.get("filter_tasks", []) or []
+    id_filters = options.get("filter_ids", []) or []
 
     def task_match(title: str) -> bool:
         if not task_filters:
             return True
         return _match_any(title, task_filters)
 
-    def node_match(node: Dict[str, Any]) -> bool:
+    def _parse_id_range(value: str) -> Optional[Tuple[str, str, int, int]]:
+        if not value or "-" not in value:
+            return None
+        parts = value.split("-", 1)
+        if len(parts) != 2:
+            return None
+        start = parts[0].strip()
+        end = parts[1].strip()
+        if not start or not end:
+            return None
+        try:
+            return start, end, int(start), int(end)
+        except ValueError:
+            return None
+
+    def _id_match(target: Any) -> bool:
+        if not id_filters:
+            return True
+        if target is None:
+            return False
+        target_str = str(target)
+        try:
+            target_int = int(target_str)
+        except ValueError:
+            target_int = None
+        for fid in id_filters:
+            if fid is None:
+                continue
+            fid_str = str(fid).strip()
+            if not fid_str:
+                continue
+            range_pair = _parse_id_range(fid_str)
+            if range_pair:
+                start_str, end_str, start_int, end_int = range_pair
+                if (
+                    len(start_str) == len(end_str)
+                    and len(target_str) >= len(start_str)
+                ):
+                    prefix_val = target_str[: len(start_str)]
+                    try:
+                        prefix_int = int(prefix_val)
+                    except ValueError:
+                        prefix_int = None
+                    if prefix_int is not None and start_int <= prefix_int <= end_int:
+                        return True
+                if target_int is not None and start_int <= target_int <= end_int:
+                    return True
+                continue
+            if target_str.startswith(fid_str):
+                return True
+        return False
+
+    def node_match(node: Dict[str, Any], task_id_match: bool) -> bool:
         if node["type"] == "branch":
             return True
         text = node.get("text", "") or ""
         role = node.get("role", "") or ""
+        node_id = node.get("id")
+        if id_filters and not task_id_match and not _id_match(node_id):
+            return False
         if role_exclude and role in role_exclude:
             return False
         if role_include and role not in role_include:
@@ -441,13 +511,13 @@ def _filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
             return False
         return True
 
-    def filter_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def filter_nodes(nodes: List[Dict[str, Any]], task_id_match: bool) -> List[Dict[str, Any]]:
         filtered: List[Dict[str, Any]] = []
         for node in nodes:
             if node["type"] == "branch":
                 options_nodes = []
                 for option in node.get("options", []):
-                    option_filtered = filter_nodes(option)
+                    option_filtered = filter_nodes(option, task_id_match)
                     if option_filtered:
                         options_nodes.append(option_filtered)
                 if options_nodes:
@@ -459,7 +529,7 @@ def _filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
                         }
                     )
                 continue
-            if node_match(node):
+            if node_match(node, task_id_match):
                 filtered.append(node)
         return filtered
 
@@ -468,11 +538,16 @@ def _filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
         title = task.get("title") or ""
         if not task_match(title):
             continue
-        nodes = filter_nodes(task.get("nodes", []))
+        story_id = task.get("story_id")
+        task_id = task.get("task_id")
+        task_id_match = _id_match(story_id) or _id_match(task_id)
+        nodes = filter_nodes(task.get("nodes", []), task_id_match)
         if not nodes:
             continue
         filtered_tasks.append(
             {
+                "story_id": story_id,
+                "task_id": task_id,
                 "title": task.get("title"),
                 "desc": task.get("desc"),
                 "nodes": nodes,
@@ -513,9 +588,11 @@ def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
 
     for story_key in story_keys:
         story = story_list.get(story_key, {})
+        story_id = story.get("id", story_key)
         story_steps = story.get("story") or {}
         for step_key in _sort_keys_numeric(story_steps.keys()):
             step = story_steps.get(step_key, {})
+            task_id = step.get("id", step_key)
             title = _replace_traveler(step.get("title") or "")
             step_desc = step.get("stepDescription")
             step_desc = _replace_traveler(step_desc) if step_desc else ""
@@ -529,6 +606,8 @@ def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
 
             doc["tasks"].append(
                 {
+                    "story_id": story_id,
+                    "task_id": task_id,
                     "title": title,
                     "desc": step_desc,
                     "nodes": nodes,
@@ -614,6 +693,12 @@ def main() -> None:
         default=[],
         help="Only include tasks whose title contains keyword (repeatable)",
     )
+    parser.add_argument(
+        "--filter-id",
+        action="append",
+        default=[],
+        help="Only include content matching ID prefix (repeatable)",
+    )
     args = parser.parse_args()
 
     global UNKNOWN_ROLE
@@ -641,6 +726,7 @@ def main() -> None:
         "filter_keywords": args.filter_keyword,
         "exclude_keywords": args.exclude_keyword,
         "filter_tasks": args.filter_task,
+        "filter_ids": args.filter_id,
     }
     if args.format_file:
         renderer_spec, cfg = _load_renderer(args.format_file)
@@ -652,6 +738,7 @@ def main() -> None:
             "filter_keywords": cfg["options"].get("filter_keywords", []),
             "exclude_keywords": cfg["options"].get("exclude_keywords", []),
             "filter_tasks": cfg["options"].get("filter_tasks", []),
+            "filter_ids": cfg["options"].get("filter_ids", []),
         }
         for key, value in cli_filter_opts.items():
             if value:
