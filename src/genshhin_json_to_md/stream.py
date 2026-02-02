@@ -1,11 +1,14 @@
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import config
 from .filters import filter_doc
 from .parser import build_dialog_nodes, sort_keys_numeric
 from .placeholders import replace_traveler
-from .renderers.templates import render_nodes_with_templates
+from .renderers.templates import (
+    format_template,
+    normalize_templates_config,
+    render_nodes_with_templates,
+)
 
 
 def _stream_find_object(file_obj, key: str, decoder: json.JSONDecoder) -> Tuple[Optional[Dict[str, Any]], str]:
@@ -102,11 +105,7 @@ def render_stream(
     config_dict: Dict[str, Any],
     filter_opts: Dict[str, Any],
 ) -> None:
-    templates = {**config.DEFAULT_TEMPLATES, **config_dict.get("templates", {})}
-    options = config_dict.get("options", {})
-    if "skip_fields" not in options:
-        options = {**options, "skip_fields": ["story_id", "task_id", "dialog_id"]}
-    skip_fields = set(options.get("skip_fields", []))
+    templates, options, skip_fields = normalize_templates_config(config_dict)
 
     def _tpl(key: str) -> Optional[str]:
         tpl = templates.get(key)
@@ -118,6 +117,12 @@ def render_stream(
             return None
         return tpl
 
+    def _fmt(key: str, **kwargs: Any) -> Optional[str]:
+        tpl = _tpl(key)
+        if tpl is None:
+            return None
+        return format_template(tpl, key, **kwargs)
+
     decoder = json.JSONDecoder()
     with open(input_path, "r", encoding="utf-8") as f:
         info, buffer = _stream_find_object(f, "info", decoder)
@@ -126,15 +131,14 @@ def render_stream(
         chapter_num = replace_traveler(info.get("chapterNum", "") or "")
         chapter_title = replace_traveler(info.get("chapterTitle", "") or "")
         if chapter_title:
-            title_line = _tpl("chapter_title")
+            title_line = _fmt(
+                "chapter_title",
+                chapter_num=chapter_num,
+                chapter_title=chapter_title,
+            )
             if title_line:
-                output_handle.write(
-                    title_line.format(
-                        chapter_num=chapter_num, chapter_title=chapter_title
-                    ).strip()
-                    + "\n"
-                )
-        elif chapter_num:
+                output_handle.write(title_line.strip() + "\n")
+        elif chapter_num and _tpl("chapter_title"):
             output_handle.write(f"# {chapter_num}\n")
 
         chapter_desc_written = False
@@ -144,8 +148,10 @@ def render_stream(
             if not chapter_desc_written:
                 desc = (story.get("info") or {}).get("description") or ""
                 desc = replace_traveler(desc)
-                if desc and _tpl("chapter_desc"):
-                    output_handle.write(_tpl("chapter_desc").format(chapter_desc=desc) + "\n")
+                if desc:
+                    desc_line = _fmt("chapter_desc", chapter_desc=desc)
+                    if desc_line:
+                        output_handle.write(desc_line + "\n")
                 chapter_desc_written = True
 
             story_id = story.get("id")
@@ -183,24 +189,24 @@ def render_stream(
                     continue
                 task = filtered["tasks"][0]
 
-                if task.get("story_id") and _tpl("story_id"):
-                    output_handle.write(
-                        _tpl("story_id").format(story_id=task["story_id"]) + "\n"
-                    )
-                if task.get("task_id") and _tpl("task_id"):
-                    output_handle.write(
-                        _tpl("task_id").format(task_id=task["task_id"]) + "\n"
-                    )
+                if task.get("story_id"):
+                    story_line = _fmt("story_id", story_id=task["story_id"])
+                    if story_line:
+                        output_handle.write(story_line + "\n")
+                if task.get("task_id"):
+                    task_line = _fmt("task_id", task_id=task["task_id"])
+                    if task_line:
+                        output_handle.write(task_line + "\n")
 
                 if task.get("title") and _tpl("task_title"):
                     output_handle.write("\n")
-                    output_handle.write(
-                        _tpl("task_title").format(task_title=task["title"]) + "\n"
-                    )
-                if task.get("desc") and _tpl("task_desc"):
-                    output_handle.write(
-                        _tpl("task_desc").format(task_desc=task["desc"]) + "\n"
-                    )
+                    title_line = _fmt("task_title", task_title=task["title"])
+                    if title_line:
+                        output_handle.write(title_line + "\n")
+                if task.get("desc"):
+                    desc_line = _fmt("task_desc", task_desc=task["desc"])
+                    if desc_line:
+                        output_handle.write(desc_line + "\n")
                 if task.get("nodes"):
                     lines = render_nodes_with_templates(
                         task["nodes"], templates, options, 0

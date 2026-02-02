@@ -11,12 +11,22 @@ def match_any(text: str, keywords: List[str]) -> bool:
 
 
 def filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
-    role_include = options.get("filter_roles", []) or []
-    role_exclude = options.get("exclude_roles", []) or []
-    keyword_include = options.get("filter_keywords", []) or []
-    keyword_exclude = options.get("exclude_keywords", []) or []
-    task_filters = options.get("filter_tasks", []) or []
-    id_filters = options.get("filter_ids", []) or []
+    def ensure_list(key: str) -> List[Any]:
+        value = options.get(key, [])
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        raise ValueError(f"Filter option '{key}' must be a list.")
+
+    role_include = ensure_list("filter_roles")
+    role_exclude = ensure_list("exclude_roles")
+    keyword_include = ensure_list("filter_keywords")
+    keyword_exclude = ensure_list("exclude_keywords")
+    task_filters = ensure_list("filter_tasks")
+    id_filters = ensure_list("filter_ids")
 
     def task_match(title: str) -> bool:
         if not task_filters:

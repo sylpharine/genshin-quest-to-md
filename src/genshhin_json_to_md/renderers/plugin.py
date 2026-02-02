@@ -9,11 +9,24 @@ except ImportError as exc:  # pragma: no cover - runtime dependency check
 
 
 def load_renderer(format_file: str) -> Tuple[str, Dict[str, Any]]:
-    with open(format_file, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
+    try:
+        with open(format_file, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Failed to parse YAML config: {format_file}: {exc}") from exc
+    if not isinstance(config, dict):
+        raise ValueError(f"Format config must be a mapping (YAML object): {format_file}")
+    if "templates" in config and config["templates"] is not None:
+        if not isinstance(config["templates"], dict):
+            raise ValueError(f"templates must be a mapping (YAML object): {format_file}")
+    if "options" in config and config["options"] is not None:
+        if not isinstance(config["options"], dict):
+            raise ValueError(f"options must be a mapping (YAML object): {format_file}")
     renderer_spec = config.get("renderer")
     if not renderer_spec:
         return "templates", config
+    if not isinstance(renderer_spec, str):
+        raise ValueError("renderer must be a string in 'path.py:function' format.")
     return renderer_spec, config
 
 

@@ -5,3 +5,7 @@ output/
 orig/
 *.egg-info/
 *.egg
+dist/
+build/
+.env
+.venv
