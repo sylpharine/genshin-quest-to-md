@@ -1,0 +1,9 @@
+{
+  "renderer": "format_examples/renderer_novel.py:render",
+  "options": {
+    "role_prefix": "",
+    "dialog_sep": "\n",
+    "branch_prefix": "> ",
+    "branch_label": "分支{index}"
+  }
+}

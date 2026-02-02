@@ -22,7 +22,7 @@ DEFAULT_TEMPLATES = {
     "dialog_line": "{role}：{text}",
     "dialog_cont": "    {text}",
     "branch_label": "【分支{index}】",
-    "black_screen": "**_{text}_**",
+    "black_screen": "*{text}*",
 }
 
 
@@ -280,13 +280,25 @@ def _render_nodes_with_templates(
     last_indent = None
 
     indent_unit = options.get("indent_unit", "  ")
+    skip_fields = set(options.get("skip_fields", []))
+
+    def _tpl(key: str) -> Optional[str]:
+        tpl = templates.get(key)
+        if tpl is None:
+            return None
+        if isinstance(tpl, str) and tpl == "":
+            return None
+        if key in skip_fields:
+            return None
+        return tpl
 
     for node in nodes:
         prefix = indent_unit * indent_level
         if node["type"] == "branch":
             for idx, option in enumerate(node["options"], 1):
-                label = templates["branch_label"].format(index=idx)
-                lines.append(f"{prefix}{label}")
+                if _tpl("branch_label"):
+                    label = _tpl("branch_label").format(index=idx)
+                    lines.append(f"{prefix}{label}")
                 lines.extend(
                     _render_nodes_with_templates(
                         option, templates, options, indent_level + 1
@@ -298,18 +310,21 @@ def _render_nodes_with_templates(
         text = node.get("text", "")
         is_black = bool(node.get("is_black_screen", False))
         if is_black:
-            lines.append(f"{prefix}{templates['black_screen'].format(text=text)}")
+            if _tpl("black_screen"):
+                lines.append(f"{prefix}{_tpl('black_screen').format(text=text)}")
             last_was_dialog = False
             continue
 
         if last_was_dialog and role == last_role and indent_level == last_indent:
-            lines.append(
-                f"{prefix}{templates['dialog_cont'].format(text=text, role=role)}"
-            )
+            if _tpl("dialog_cont"):
+                lines.append(
+                    f"{prefix}{_tpl('dialog_cont').format(text=text, role=role)}"
+                )
         else:
-            lines.append(
-                f"{prefix}{templates['dialog_line'].format(role=role, text=text)}"
-            )
+            if _tpl("dialog_line"):
+                lines.append(
+                    f"{prefix}{_tpl('dialog_line').format(role=role, text=text)}"
+                )
             last_role = role
             last_indent = indent_level
             last_was_dialog = True
@@ -320,12 +335,23 @@ def _render_nodes_with_templates(
 def _render_with_templates(doc: Dict[str, Any], config: Dict[str, Any]) -> str:
     templates = {**DEFAULT_TEMPLATES, **config.get("templates", {})}
     options = config.get("options", {})
+    skip_fields = set(options.get("skip_fields", []))
+
+    def _tpl(key: str) -> Optional[str]:
+        tpl = templates.get(key)
+        if tpl is None:
+            return None
+        if isinstance(tpl, str) and tpl == "":
+            return None
+        if key in skip_fields:
+            return None
+        return tpl
 
     lines: List[str] = []
     chapter_num = doc.get("chapter_num", "")
     chapter_title_value = doc.get("chapter_title", "")
-    if chapter_title_value:
-        chapter_title = templates["chapter_title"].format(
+    if chapter_title_value and _tpl("chapter_title"):
+        chapter_title = _tpl("chapter_title").format(
             chapter_num=chapter_num,
             chapter_title=chapter_title_value,
         ).strip()
@@ -334,17 +360,17 @@ def _render_with_templates(doc: Dict[str, Any], config: Dict[str, Any]) -> str:
     if chapter_title:
         lines.append(chapter_title)
     chapter_desc = doc.get("chapter_desc", "")
-    if chapter_desc:
-        lines.append(templates["chapter_desc"].format(chapter_desc=chapter_desc))
+    if chapter_desc and _tpl("chapter_desc"):
+        lines.append(_tpl("chapter_desc").format(chapter_desc=chapter_desc))
 
     for task in doc.get("tasks", []):
         title = task.get("title") or ""
-        if title:
+        if title and _tpl("task_title"):
             lines.append("")
-            lines.append(templates["task_title"].format(task_title=title))
+            lines.append(_tpl("task_title").format(task_title=title))
         desc = task.get("desc") or ""
-        if desc:
-            lines.append(templates["task_desc"].format(task_desc=desc))
+        if desc and _tpl("task_desc"):
+            lines.append(_tpl("task_desc").format(task_desc=desc))
         nodes = task.get("nodes") or []
         lines.extend(_render_nodes_with_templates(nodes, templates, options, 0))
 

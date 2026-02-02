@@ -1,0 +1,16 @@
+{
+  "templates": {
+    "chapter_title": "# {chapter_num} 《{chapter_title}》",
+    "chapter_desc": "{chapter_desc}",
+    "task_title": "## {task_title}",
+    "task_desc": "{task_desc}",
+    "dialog_line": "{role}：{text}",
+    "dialog_cont": "    {text}",
+    "branch_label": "【分支{index}】",
+    "black_screen": "*{text}*"
+  },
+  "options": {
+    "indent_unit": "  ",
+    "skip_fields": []
+  }
+}

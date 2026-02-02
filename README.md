@@ -64,6 +64,7 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_exam
 - `black_screen`
 
 模板可用变量示例：`{chapter_num}`, `{chapter_title}`, `{task_title}`, `{role}`, `{text}`, `{index}`。
+你可以通过 `options.skip_fields` 禁用指定字段渲染，或将模板值设为空字符串。
 
 ### 渲染器模式（renderer）
 `format_examples/renderer.novel.json` 指定了一个 Python 渲染器：
