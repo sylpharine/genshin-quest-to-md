@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.8"
 
 [[package]]
-name = "genshhin-json-to-md"
+name = "genshin-quest-to-md"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

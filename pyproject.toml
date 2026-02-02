@@ -1,7 +1,7 @@
 [project]
-name = "genshhin-json-to-md"
+name = "genshin-quest-to-md"
 version = "0.1.0"
-description = "Add your description here"
+description = "把原神任务剧情 JSON 转为 Markdown 的小脚本。"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-json2md = "genshhin_json_to_md.cli:main"
+json2md = "json_to_md.cli:main"
 
 [build-system]
 requires = ["setuptools>=61"]
