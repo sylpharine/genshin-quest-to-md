@@ -78,7 +78,7 @@ def _walk_dialog(
     dialog_id: Any,
     indent_level: int,
     path: set,
-) -> List[str]:
+) -> List[Dict[str, Any]]:
     if dialog_id is None:
         return []
 
@@ -94,18 +94,19 @@ def _walk_dialog(
 
     role = _replace_traveler(_safe_role(dialog.get("role", "")))
     text_entries = dialog.get("text") or []
-    entries = []
+    is_black_screen = bool(dialog.get("isBlackScreen", False))
+    dialog_entries = []
     for entry in text_entries:
         text = _replace_traveler(entry.get("text", ""))
-        entries.append((text, entry.get("next")))
+        dialog_entries.append((text, entry.get("next"), is_black_screen))
 
-    if not entries:
+    if not dialog_entries:
         return []
 
     dialog_type = dialog.get("type", "")
     is_multi = dialog_type == "MultiDialog"
     unique_next = []
-    for _, next_id in entries:
+    for _, next_id, _ in dialog_entries:
         if next_id is None:
             continue
         if next_id not in unique_next:
@@ -127,20 +128,26 @@ def _walk_dialog(
         next_text = _replace_traveler(next_entries[0].get("text", ""))
         return next_text == text_value
 
-    lines: List[str] = []
+    output: List[Dict[str, Any]] = []
     if branching and is_multi and len(unique_next) == 1:
-        branch_prefix = "  " * indent_level
-        child_prefix = "  " * (indent_level + 1)
-        for idx, (text, _) in enumerate(entries, 1):
-            lines.append(f"{branch_prefix}【分支{idx}】")
-            lines.append(f"{child_prefix}{role}：{text}")
+        for idx, (text, _, _) in enumerate(dialog_entries, 1):
+            output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
+            output.append(
+                {
+                    "type": "dialog",
+                    "indent": indent_level + 1,
+                    "role": role,
+                    "text": text,
+                    "is_black_screen": is_black_screen,
+                }
+            )
         next_id = unique_next[0]
-        lines.extend(_walk_dialog(items, next_id, indent_level, path))
-        return lines
+        output.extend(_walk_dialog(items, next_id, indent_level, path))
+        return output
 
     if branching and is_multi:
         echo_next_ids = []
-        for text, next_id in entries:
+        for text, next_id, _ in dialog_entries:
             if not _is_echo(next_id, role, text):
                 echo_next_ids = []
                 break
@@ -157,34 +164,53 @@ def _walk_dialog(
             echo_next_ids.append(next_ids[0])
 
         if echo_next_ids and all(nid == echo_next_ids[0] for nid in echo_next_ids):
-            branch_prefix = "  " * indent_level
-            child_prefix = "  " * (indent_level + 1)
-            for idx, (text, _) in enumerate(entries, 1):
-                lines.append(f"{branch_prefix}【分支{idx}】")
-                lines.append(f"{child_prefix}{role}：{text}")
-            lines.extend(_walk_dialog(items, echo_next_ids[0], indent_level, path))
-            return lines
+            for idx, (text, _, _) in enumerate(dialog_entries, 1):
+                output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
+                output.append(
+                    {
+                        "type": "dialog",
+                        "indent": indent_level + 1,
+                        "role": role,
+                        "text": text,
+                        "is_black_screen": is_black_screen,
+                    }
+                )
+            output.extend(_walk_dialog(items, echo_next_ids[0], indent_level, path))
+            return output
 
     if branching:
-        branch_prefix = "  " * indent_level
-        child_prefix = "  " * (indent_level + 1)
-        for idx, (text, next_id) in enumerate(entries, 1):
-            lines.append(f"{branch_prefix}【分支{idx}】")
+        for idx, (text, next_id, _) in enumerate(dialog_entries, 1):
+            output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
             if not (is_multi and _is_echo(next_id, role, text)):
-                lines.append(f"{child_prefix}{role}：{text}")
+                output.append(
+                    {
+                        "type": "dialog",
+                        "indent": indent_level + 1,
+                        "role": role,
+                        "text": text,
+                        "is_black_screen": is_black_screen,
+                    }
+                )
             if next_id is not None:
-                lines.extend(_walk_dialog(items, next_id, indent_level + 1, set(path)))
-        return lines
+                output.extend(_walk_dialog(items, next_id, indent_level + 1, set(path)))
+        return output
 
-    prefix = "  " * indent_level
-    for text, _ in entries:
-        lines.append(f"{prefix}{role}：{text}")
+    for text, _, _ in dialog_entries:
+        output.append(
+            {
+                "type": "dialog",
+                "indent": indent_level,
+                "role": role,
+                "text": text,
+                "is_black_screen": is_black_screen,
+            }
+        )
 
     next_id = unique_next[0] if unique_next else None
     if next_id is None:
-        return lines
-    lines.extend(_walk_dialog(items, next_id, indent_level, path))
-    return lines
+        return output
+    output.extend(_walk_dialog(items, next_id, indent_level, path))
+    return output
 
 
 def _extract_dialogue_lines(task: Dict[str, Any]) -> List[str]:
@@ -192,7 +218,36 @@ def _extract_dialogue_lines(task: Dict[str, Any]) -> List[str]:
     init_dialog = task.get("initDialog")
     if init_dialog is None:
         return []
-    return _walk_dialog(items, init_dialog, 0, set())
+    entries = _walk_dialog(items, init_dialog, 0, set())
+
+    lines: List[str] = []
+    last_role = None
+    last_indent = None
+    last_was_dialog = False
+
+    for entry in entries:
+        indent = entry["indent"]
+        prefix = "  " * indent
+        if entry["type"] == "label":
+            lines.append(f"{prefix}{entry['text']}")
+            last_was_dialog = False
+            continue
+        role = entry["role"]
+        text = entry["text"]
+        is_black_screen = bool(entry.get("is_black_screen", False))
+        if is_black_screen:
+            lines.append(f"{prefix}*{text}*")
+            last_was_dialog = False
+            continue
+        if last_was_dialog and role == last_role and indent == last_indent:
+            lines.append(f"{prefix}    {text}")
+        else:
+            lines.append(f"{prefix}{role}：{text}")
+            last_role = role
+            last_indent = indent
+            last_was_dialog = True
+
+    return lines
 
 
 def json_to_md(data: Dict[str, Any]) -> str:
