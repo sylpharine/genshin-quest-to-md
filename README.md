@@ -1,6 +1,7 @@
-# genshhin_json_to_md
+# genshhin quest to markdown
 
 把任务剧情 JSON 转为 Markdown 的小脚本。
+> 请自行前往[安柏网](https://ambr.top/chs/archive/quest)获取剧情的JSON格式文件
 
 ## 功能
 - 输出章节标题与描述
