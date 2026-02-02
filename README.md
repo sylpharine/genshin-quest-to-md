@@ -1,7 +1,7 @@
 # genshhin quest to markdown
 
 把任务剧情 JSON 转为 Markdown 的小脚本。
-> 请自行前往[安柏网](https://ambr.top/chs/archive/quest)获取剧情的JSON格式文件
+> 请自行前往[安柏网](https://ambr.top/chs/archive/quest)获取剧情文本的 JSON 格式文件
 
 ## 功能
 - 输出章节标题与描述
@@ -36,6 +36,11 @@ python3 json2md.py "在岩间.json" -o "在岩间.md"
 - `--exclude-keyword`：排除包含关键词的对话（可重复）
 - `--filter-task`：仅输出任务标题包含关键词的任务（可重复）
 - `--filter-id`：仅输出匹配指定 ID 前缀的内容（可重复）
+- `--stream`：流式解析大 JSON（仅模板渲染）
+
+流式模式说明：
+- 仅支持模板渲染（`renderer` 插件不支持）
+- 适合超大 JSON，减少内存占用
 
 ## 示例
 ```bash
