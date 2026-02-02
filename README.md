@@ -110,6 +110,10 @@ def render(doc, options) -> str:
   - `dialog`: `{type, role, text, is_black_screen}`
   - `branch`: `{type, id, options}`，`options` 是多个节点列表
 
+渲染器示例已更新以匹配当前项目字段：
+- 支持 `story_id` / `task_id` / `dialog_id`
+- 支持 `skip_fields`（与模板一致）
+
 ## 默认输出格式示例
 ```md
 # 奔霄颂玉轮 第二幕 《在岩间》
