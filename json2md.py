@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import importlib.util
 import json
 import re
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 UNKNOWN_ROLE = "Unknown"
 TRAVELER_NAME = "旅行者"
@@ -11,6 +13,17 @@ WANDERER_NAME = "流浪者"
 SHOW_BRANCHES = True
 BRANCH_CHOICES = {}
 BRANCH_DEFAULT = 1
+
+DEFAULT_TEMPLATES = {
+    "chapter_title": "# {chapter_num} 《{chapter_title}》",
+    "chapter_desc": "{chapter_desc}",
+    "task_title": "## {task_title}",
+    "task_desc": "{task_desc}",
+    "dialog_line": "{role}：{text}",
+    "dialog_cont": "    {text}",
+    "branch_label": "【分支{index}】",
+    "black_screen": "**_{text}_**",
+}
 
 
 def _sort_keys_numeric(keys):
@@ -111,254 +124,284 @@ def _replace_traveler(text: str) -> str:
     return text
 
 
-def _walk_dialog(
-    items: Dict[str, Any],
-    dialog_id: Any,
-    indent_level: int,
-    path: set,
-) -> List[Dict[str, Any]]:
-    if dialog_id is None:
-        return []
-
-    current = str(dialog_id)
-    if current == "finish" or current in path:
-        return []
-
-    dialog = items.get(current)
-    if not dialog:
-        return []
-
-    path.add(current)
-
-    role = _replace_traveler(_safe_role(dialog.get("role", "")))
-    text_entries = dialog.get("text") or []
-    is_black_screen = bool(dialog.get("isBlackScreen", False))
-    dialog_entries = []
-    for entry in text_entries:
-        text = _replace_traveler(entry.get("text", ""))
-        dialog_entries.append((text, entry.get("next"), is_black_screen))
-
-    if not dialog_entries:
-        return []
-
-    dialog_type = dialog.get("type", "")
-    is_multi = dialog_type == "MultiDialog"
-    unique_next = []
-    for _, next_id, _ in dialog_entries:
-        if next_id is None:
-            continue
-        if next_id not in unique_next:
-            unique_next.append(next_id)
-    branching = is_multi or len(unique_next) > 1
-
-    def _is_echo(next_id: Any, role_name: str, text_value: str) -> bool:
-        if next_id is None:
-            return False
-        next_dialog = items.get(str(next_id))
-        if not next_dialog or next_dialog.get("type") != "SingleDialog":
-            return False
-        next_role = _replace_traveler(_safe_role(next_dialog.get("role", "")))
-        if next_role != role_name:
-            return False
-        next_entries = next_dialog.get("text") or []
-        if not next_entries:
-            return False
-        next_text = _replace_traveler(next_entries[0].get("text", ""))
-        return next_text == text_value
-
-    if not SHOW_BRANCHES and is_multi:
-        choice_index = _select_branch_index(current, len(dialog_entries))
-        text, next_id, is_black = dialog_entries[choice_index - 1]
-        output: List[Dict[str, Any]] = []
-        if _is_echo(next_id, role, text):
-            next_after_echo = None
-            next_dialog = items.get(str(next_id))
-            if next_dialog and next_dialog.get("type") == "SingleDialog":
-                next_entries = next_dialog.get("text") or []
-                next_ids = []
-                for entry in next_entries:
-                    nid = entry.get("next")
-                    if nid is not None and nid not in next_ids:
-                        next_ids.append(nid)
-                if len(next_ids) == 1:
-                    next_after_echo = next_ids[0]
-            if next_after_echo is not None:
-                output.append(
-                    {
-                        "type": "dialog",
-                        "indent": indent_level,
-                        "role": role,
-                        "text": text,
-                        "is_black_screen": is_black,
-                    }
-                )
-                output.extend(_walk_dialog(items, next_after_echo, indent_level, path))
-                return output
-            output.extend(_walk_dialog(items, next_id, indent_level, path))
-            return output
-        output.append(
-            {
-                "type": "dialog",
-                "indent": indent_level,
-                "role": role,
-                "text": text,
-                "is_black_screen": is_black,
-            }
-        )
-        if next_id is not None:
-            output.extend(_walk_dialog(items, next_id, indent_level, path))
-        return output
-
-    if not SHOW_BRANCHES and not is_multi:
-        branching = False
-
-    output: List[Dict[str, Any]] = []
-    if branching and is_multi and len(unique_next) == 1:
-        for idx, (text, _, _) in enumerate(dialog_entries, 1):
-            output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
-            output.append(
-                {
-                    "type": "dialog",
-                    "indent": indent_level + 1,
-                    "role": role,
-                    "text": text,
-                    "is_black_screen": is_black_screen,
-                }
-            )
-        next_id = unique_next[0]
-        output.extend(_walk_dialog(items, next_id, indent_level, path))
-        return output
-
-    if branching and is_multi:
-        echo_next_ids = []
-        for text, next_id, _ in dialog_entries:
-            if not _is_echo(next_id, role, text):
-                echo_next_ids = []
-                break
-            next_dialog = items.get(str(next_id))
-            next_entries = next_dialog.get("text") or []
-            next_ids = []
-            for entry in next_entries:
-                nid = entry.get("next")
-                if nid is not None and nid not in next_ids:
-                    next_ids.append(nid)
-            if len(next_ids) != 1:
-                echo_next_ids = []
-                break
-            echo_next_ids.append(next_ids[0])
-
-        if echo_next_ids and all(nid == echo_next_ids[0] for nid in echo_next_ids):
-            for idx, (text, _, _) in enumerate(dialog_entries, 1):
-                output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
-                output.append(
-                    {
-                        "type": "dialog",
-                        "indent": indent_level + 1,
-                        "role": role,
-                        "text": text,
-                        "is_black_screen": is_black_screen,
-                    }
-                )
-            output.extend(_walk_dialog(items, echo_next_ids[0], indent_level, path))
-            return output
-
-    if branching:
-        for idx, (text, next_id, _) in enumerate(dialog_entries, 1):
-            output.append({"type": "label", "indent": indent_level, "text": f"【分支{idx}】"})
-            if not (is_multi and _is_echo(next_id, role, text)):
-                output.append(
-                    {
-                        "type": "dialog",
-                        "indent": indent_level + 1,
-                        "role": role,
-                        "text": text,
-                        "is_black_screen": is_black_screen,
-                    }
-                )
-            if next_id is not None:
-                output.extend(_walk_dialog(items, next_id, indent_level + 1, set(path)))
-        return output
-
-    for text, _, _ in dialog_entries:
-        output.append(
-            {
-                "type": "dialog",
-                "indent": indent_level,
-                "role": role,
-                "text": text,
-                "is_black_screen": is_black_screen,
-            }
-        )
-
-    next_id = unique_next[0] if unique_next else None
-    if next_id is None:
-        return output
-    output.extend(_walk_dialog(items, next_id, indent_level, path))
-    return output
+def _next_after_echo(items: Dict[str, Any], next_id: Any) -> Optional[Any]:
+    next_dialog = items.get(str(next_id))
+    if not next_dialog or next_dialog.get("type") != "SingleDialog":
+        return None
+    next_entries = next_dialog.get("text") or []
+    if not next_entries:
+        return None
+    next_ids = []
+    for entry in next_entries:
+        nid = entry.get("next")
+        if nid is not None and nid not in next_ids:
+            next_ids.append(nid)
+    if len(next_ids) == 1:
+        return next_ids[0]
+    return None
 
 
-def _extract_dialogue_lines(task: Dict[str, Any]) -> List[str]:
+def _build_dialog_nodes(task: Dict[str, Any]) -> List[Dict[str, Any]]:
     items = task.get("items") or {}
     init_dialog = task.get("initDialog")
     if init_dialog is None:
         return []
-    entries = _walk_dialog(items, init_dialog, 0, set())
 
+    def _walk(items: Dict[str, Any], dialog_id: Any, path: set) -> List[Dict[str, Any]]:
+        if dialog_id is None:
+            return []
+
+        current = str(dialog_id)
+        if current == "finish" or current in path:
+            return []
+
+        dialog = items.get(current)
+        if not dialog:
+            return []
+
+        path.add(current)
+
+        role = _replace_traveler(_safe_role(dialog.get("role", "")))
+        text_entries = dialog.get("text") or []
+        is_black_screen = bool(dialog.get("isBlackScreen", False))
+        dialog_entries: List[Tuple[str, Any]] = []
+        for entry in text_entries:
+            text = _replace_traveler(entry.get("text", ""))
+            dialog_entries.append((text, entry.get("next")))
+
+        if not dialog_entries:
+            return []
+
+        dialog_type = dialog.get("type", "")
+        is_multi = dialog_type == "MultiDialog"
+        unique_next = []
+        for _, next_id in dialog_entries:
+            if next_id is None:
+                continue
+            if next_id not in unique_next:
+                unique_next.append(next_id)
+        branching = is_multi or len(unique_next) > 1
+
+        def _is_echo(next_id: Any, role_name: str, text_value: str) -> bool:
+            if next_id is None:
+                return False
+            next_dialog = items.get(str(next_id))
+            if not next_dialog or next_dialog.get("type") != "SingleDialog":
+                return False
+            next_role = _replace_traveler(_safe_role(next_dialog.get("role", "")))
+            if next_role != role_name:
+                return False
+            next_entries = next_dialog.get("text") or []
+            if not next_entries:
+                return False
+            next_text = _replace_traveler(next_entries[0].get("text", ""))
+            return next_text == text_value
+
+        def _dialog_node(text_value: str) -> Dict[str, Any]:
+            return {
+                "type": "dialog",
+                "role": role,
+                "text": text_value,
+                "is_black_screen": is_black_screen,
+            }
+
+        if not SHOW_BRANCHES and is_multi:
+            choice_index = _select_branch_index(current, len(dialog_entries))
+            text, next_id = dialog_entries[choice_index - 1]
+            nodes: List[Dict[str, Any]] = []
+            if _is_echo(next_id, role, text):
+                next_after = _next_after_echo(items, next_id)
+                if next_after is not None:
+                    nodes.append(_dialog_node(text))
+                    nodes.extend(_walk(items, next_after, path))
+                    return nodes
+            nodes.append(_dialog_node(text))
+            if next_id is not None:
+                nodes.extend(_walk(items, next_id, path))
+            return nodes
+
+        if not SHOW_BRANCHES and not is_multi:
+            branching = False
+
+        if branching and is_multi and len(unique_next) == 1:
+            options = []
+            for text, _ in dialog_entries:
+                options.append([_dialog_node(text)])
+            common = _walk(items, unique_next[0], path)
+            return [{"type": "branch", "id": current, "options": options}] + common
+
+        if branching and is_multi:
+            echo_next_ids = []
+            for text, next_id in dialog_entries:
+                if not _is_echo(next_id, role, text):
+                    echo_next_ids = []
+                    break
+                next_after = _next_after_echo(items, next_id)
+                if next_after is None:
+                    echo_next_ids = []
+                    break
+                echo_next_ids.append(next_after)
+            if echo_next_ids and all(nid == echo_next_ids[0] for nid in echo_next_ids):
+                options = []
+                for text, _ in dialog_entries:
+                    options.append([_dialog_node(text)])
+                common = _walk(items, echo_next_ids[0], path)
+                return [{"type": "branch", "id": current, "options": options}] + common
+
+        if branching:
+            options = []
+            for text, next_id in dialog_entries:
+                option_nodes: List[Dict[str, Any]] = []
+                if not (is_multi and _is_echo(next_id, role, text)):
+                    option_nodes.append(_dialog_node(text))
+                if next_id is not None:
+                    option_nodes.extend(_walk(items, next_id, set(path)))
+                options.append(option_nodes)
+            return [{"type": "branch", "id": current, "options": options}]
+
+        nodes = [_dialog_node(text) for text, _ in dialog_entries]
+        next_id = unique_next[0] if unique_next else None
+        if next_id is not None:
+            nodes.extend(_walk(items, next_id, path))
+        return nodes
+
+    return _walk(items, init_dialog, set())
+
+
+def _render_nodes_with_templates(
+    nodes: List[Dict[str, Any]],
+    templates: Dict[str, str],
+    options: Dict[str, Any],
+    indent_level: int = 0,
+) -> List[str]:
     lines: List[str] = []
     last_role = None
-    last_indent = None
     last_was_dialog = False
+    last_indent = None
 
-    for entry in entries:
-        indent = entry["indent"]
-        prefix = "  " * indent
-        if entry["type"] == "label":
-            lines.append(f"{prefix}{entry['text']}")
+    indent_unit = options.get("indent_unit", "  ")
+
+    for node in nodes:
+        prefix = indent_unit * indent_level
+        if node["type"] == "branch":
+            for idx, option in enumerate(node["options"], 1):
+                label = templates["branch_label"].format(index=idx)
+                lines.append(f"{prefix}{label}")
+                lines.extend(
+                    _render_nodes_with_templates(
+                        option, templates, options, indent_level + 1
+                    )
+                )
+            continue
+
+        role = node.get("role", "")
+        text = node.get("text", "")
+        is_black = bool(node.get("is_black_screen", False))
+        if is_black:
+            lines.append(f"{prefix}{templates['black_screen'].format(text=text)}")
             last_was_dialog = False
             continue
-        role = entry["role"]
-        text = entry["text"]
-        is_black_screen = bool(entry.get("is_black_screen", False))
-        if is_black_screen:
-            lines.append(f"{prefix}*{text}*")
-            last_was_dialog = False
-            continue
-        if last_was_dialog and role == last_role and indent == last_indent:
-            lines.append(f"{prefix}    {text}")
+
+        if last_was_dialog and role == last_role and indent_level == last_indent:
+            lines.append(
+                f"{prefix}{templates['dialog_cont'].format(text=text, role=role)}"
+            )
         else:
-            lines.append(f"{prefix}{role}：{text}")
+            lines.append(
+                f"{prefix}{templates['dialog_line'].format(role=role, text=text)}"
+            )
             last_role = role
-            last_indent = indent
+            last_indent = indent_level
             last_was_dialog = True
 
     return lines
 
 
-def json_to_md(data: Dict[str, Any]) -> str:
+def _render_with_templates(doc: Dict[str, Any], config: Dict[str, Any]) -> str:
+    templates = {**DEFAULT_TEMPLATES, **config.get("templates", {})}
+    options = config.get("options", {})
+
+    lines: List[str] = []
+    chapter_num = doc.get("chapter_num", "")
+    chapter_title_value = doc.get("chapter_title", "")
+    if chapter_title_value:
+        chapter_title = templates["chapter_title"].format(
+            chapter_num=chapter_num,
+            chapter_title=chapter_title_value,
+        ).strip()
+    else:
+        chapter_title = f"# {chapter_num}".strip() if chapter_num else ""
+    if chapter_title:
+        lines.append(chapter_title)
+    chapter_desc = doc.get("chapter_desc", "")
+    if chapter_desc:
+        lines.append(templates["chapter_desc"].format(chapter_desc=chapter_desc))
+
+    for task in doc.get("tasks", []):
+        title = task.get("title") or ""
+        if title:
+            lines.append("")
+            lines.append(templates["task_title"].format(task_title=title))
+        desc = task.get("desc") or ""
+        if desc:
+            lines.append(templates["task_desc"].format(task_desc=desc))
+        nodes = task.get("nodes") or []
+        lines.extend(_render_nodes_with_templates(nodes, templates, options, 0))
+
+    return "\n".join([line for line in lines if line is not None]).strip() + "\n"
+
+
+def _load_renderer(format_file: str) -> Tuple[str, Dict[str, Any]]:
+    with open(format_file, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    renderer_spec = config.get("renderer")
+    if not renderer_spec:
+        return "templates", config
+    return renderer_spec, config
+
+
+def _render_with_plugin(doc: Dict[str, Any], renderer_spec: str, config: Dict[str, Any]) -> str:
+    if ":" not in renderer_spec:
+        raise ValueError("renderer must be in 'path.py:function' format")
+    path_str, func_name = renderer_spec.split(":", 1)
+    path = Path(path_str)
+    if not path.is_file():
+        raise FileNotFoundError(f"Renderer file not found: {path}")
+    module_name = f"renderer_{path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, str(path))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load renderer module: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    func = getattr(module, func_name, None)
+    if func is None:
+        raise AttributeError(f"Renderer function not found: {func_name}")
+    return str(func(doc, config.get("options", {})))
+
+
+def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
     root = data.get("data", {})
     info = root.get("info", {})
     chapter_num = _replace_traveler(info.get("chapterNum", "") or "")
     chapter_title = _replace_traveler(info.get("chapterTitle", "") or "")
-    chapter_line = " ".join([part for part in [chapter_num, chapter_title] if part]).strip()
-    if chapter_title:
-        chapter_line = chapter_line.replace(chapter_title, f"《{chapter_title}》")
+    chapter_desc = ""
 
     story_list = root.get("storyList") or {}
     story_keys = _sort_keys_numeric(story_list.keys())
 
     # Try to pick the first story description as chapter description.
-    chapter_desc = ""
     if story_keys:
         first_story = story_list.get(story_keys[0], {})
         chapter_desc = _replace_traveler(
             (first_story.get("info") or {}).get("description") or ""
         )
 
-    md_lines: List[str] = []
-    if chapter_line:
-        md_lines.append(f"# {chapter_line}")
-    if chapter_desc:
-        md_lines.append(chapter_desc)
+    doc: Dict[str, Any] = {
+        "chapter_num": chapter_num,
+        "chapter_title": chapter_title,
+        "chapter_desc": chapter_desc,
+        "tasks": [],
+    }
 
     for story_key in story_keys:
         story = story_list.get(story_key, {})
@@ -366,21 +409,25 @@ def json_to_md(data: Dict[str, Any]) -> str:
         for step_key in _sort_keys_numeric(story_steps.keys()):
             step = story_steps.get(step_key, {})
             title = _replace_traveler(step.get("title") or "")
-            if title:
-                md_lines.append("")
-                md_lines.append(f"## {title}")
             step_desc = step.get("stepDescription")
-            if step_desc:
-                md_lines.append(_replace_traveler(step_desc))
+            step_desc = _replace_traveler(step_desc) if step_desc else ""
 
             task_data_list = step.get("taskData") or []
+            nodes: List[Dict[str, Any]] = []
             for task in task_data_list:
                 if task.get("taskType") != "resultDialogue":
                     continue
-                lines = _extract_dialogue_lines(task)
-                md_lines.extend(lines)
+                nodes.extend(_build_dialog_nodes(task))
 
-    return "\n".join(md_lines).strip() + "\n"
+            doc["tasks"].append(
+                {
+                    "title": title,
+                    "desc": step_desc,
+                    "nodes": nodes,
+                }
+            )
+
+    return doc
 
 
 def main() -> None:
@@ -425,6 +472,10 @@ def main() -> None:
         default=1,
         help="Default branch index when branches are hidden (default: 1)",
     )
+    parser.add_argument(
+        "--format-file",
+        help="Path to JSON format config file (templates or renderer plugin)",
+    )
     args = parser.parse_args()
 
     global UNKNOWN_ROLE
@@ -445,7 +496,15 @@ def main() -> None:
     with open(args.input, "r", encoding=args.encoding) as f:
         data = json.load(f)
 
-    md = json_to_md(data)
+    doc = json_to_doc(data)
+    if args.format_file:
+        renderer_spec, cfg = _load_renderer(args.format_file)
+        if renderer_spec == "templates":
+            md = _render_with_templates(doc, cfg)
+        else:
+            md = _render_with_plugin(doc, renderer_spec, cfg)
+    else:
+        md = _render_with_templates(doc, {})
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:

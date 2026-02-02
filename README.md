@@ -29,6 +29,7 @@ python3 json2md.py "在岩间.json" -o "在岩间.md"
 - `--hide-branches`：隐藏分支，只选择一条路径（默认展示所有分支）
 - `--branch-choice`：指定分支选择，如 `402231309-player=2`（可重复、可用逗号分隔）
 - `--branch-default`：隐藏分支时默认选择第几条，默认 `1`
+- `--format-file`：格式配置文件（JSON），支持模板或自定义渲染器
 
 ## 示例
 ```bash
@@ -46,6 +47,41 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --wanderer-name "流浪者
 
 # 隐藏分支并选择特定分支
 python3 json2md.py "在岩间.json" -o "在岩间.md" --hide-branches --branch-choice "402231309-player=2"
+
+# 使用模板配置文件
+python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/templates.default.json"
+
+# 使用自定义渲染器
+python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/renderer.novel.json"
+
+## 自定义输出格式
+### 模板模式（templates）
+`format_examples/templates.default.json` 是完整示例，你可以修改其中模板：
+- `chapter_title` / `chapter_desc`
+- `task_title` / `task_desc`
+- `dialog_line` / `dialog_cont`
+- `branch_label`
+- `black_screen`
+
+模板可用变量示例：`{chapter_num}`, `{chapter_title}`, `{task_title}`, `{role}`, `{text}`, `{index}`。
+
+### 渲染器模式（renderer）
+`format_examples/renderer.novel.json` 指定了一个 Python 渲染器：
+- `renderer`: `path/to/file.py:function`
+- `options`: 传给渲染器的参数
+
+渲染器函数签名：
+```python
+def render(doc, options) -> str:
+    ...
+```
+
+`doc` 结构包含：
+- `chapter_num`, `chapter_title`, `chapter_desc`
+- `tasks`: `[{title, desc, nodes}]`
+- `nodes` 支持 `dialog` 和 `branch`
+  - `dialog`: `{type, role, text, is_black_screen}`
+  - `branch`: `{type, id, options}`，`options` 是多个节点列表
 ```
 
 ## 输出格式示例
