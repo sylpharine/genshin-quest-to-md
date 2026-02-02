@@ -19,6 +19,11 @@
 python3 json2md.py "在岩间.json" -o "在岩间.md"
 ```
 
+使用 uv 脚本入口：
+```bash
+uv run json2md "在岩间.json" -o "在岩间.md"
+```
+
 ## 参数
 - `-o, --output`：输出 Markdown 文件路径（不传则输出到 stdout）
 - `--encoding`：输入文件编码，默认 `utf-8`
@@ -113,6 +118,56 @@ def render(doc, options) -> str:
 渲染器示例已更新以匹配当前项目字段：
 - 支持 `story_id` / `task_id` / `dialog_id`
 - 支持 `skip_fields`（与模板一致）
+
+## 项目结构
+```text
+src/genshhin_json_to_md/
+  cli.py            # CLI 入口与参数解析
+  config.py         # 全局配置与默认模板
+  placeholders.py   # 占位符与性别替换
+  parser.py         # JSON -> IR 结构（含分支合并）
+  filters.py        # 过滤器（角色/关键词/任务/ID）
+  stream.py         # 流式解析与渲染
+  renderers/
+    templates.py    # 模板渲染器
+    plugin.py       # 渲染器插件加载
+```
+
+## 架构图
+```text
+           +-----------------+
+           |      CLI        |
+           +--------+--------+
+                    |
+                    v
+        +-----------+------------+
+        |   Placeholders/Config  |
+        +-----------+------------+
+                    |
+                    v
+             +------+------+
+             |   Parser    |-----> IR (doc)
+             +------+------+
+                    |
+                    v
+             +------+------+
+             |  Filters    |
+             +------+------+
+                    |
+        +-----------+-----------+
+        |                       |
+        v                       v
+ +--------------+       +---------------+
+ | Templates    |       | Renderer Plug |
+ +------+-------+       +-------+-------+
+        |                       |
+        +-----------+-----------+
+                    v
+               Markdown
+
+流式模式：
+CLI -> stream.py -> filters.py -> templates.py -> Markdown
+```
 
 ## 默认输出格式示例
 ```md

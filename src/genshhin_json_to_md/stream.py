@@ -1,0 +1,209 @@
+import json
+from typing import Any, Dict, List, Optional, Tuple
+
+from . import config
+from .filters import filter_doc
+from .parser import build_dialog_nodes, sort_keys_numeric
+from .placeholders import replace_traveler
+from .renderers.templates import render_nodes_with_templates
+
+
+def _stream_find_object(file_obj, key: str, decoder: json.JSONDecoder) -> Tuple[Optional[Dict[str, Any]], str]:
+    buffer = ""
+    while True:
+        chunk = file_obj.read(65536)
+        if not chunk:
+            return None, buffer
+        buffer += chunk
+        key_idx = buffer.find(f"\"{key}\"")
+        if key_idx == -1:
+            if len(buffer) > 200000:
+                buffer = buffer[-200000:]
+            continue
+        colon_idx = buffer.find(":", key_idx)
+        if colon_idx == -1:
+            continue
+        start = colon_idx + 1
+        while start < len(buffer) and buffer[start].isspace():
+            start += 1
+        try:
+            obj, end = decoder.raw_decode(buffer, start)
+            remaining = buffer[end:]
+            return obj, remaining
+        except json.JSONDecodeError:
+            continue
+
+
+def _stream_story_entries(file_obj, buffer: str, decoder: json.JSONDecoder):
+    in_story = False
+    while True:
+        if not in_story:
+            idx = buffer.find("\"storyList\"")
+            if idx == -1:
+                chunk = file_obj.read(65536)
+                if not chunk:
+                    return
+                buffer += chunk
+                if len(buffer) > 200000:
+                    buffer = buffer[-200000:]
+                continue
+            brace_idx = buffer.find("{", idx)
+            if brace_idx == -1:
+                chunk = file_obj.read(65536)
+                if not chunk:
+                    return
+                buffer += chunk
+                continue
+            buffer = buffer[brace_idx + 1 :]
+            in_story = True
+
+        while True:
+            buffer = buffer.lstrip()
+            if not buffer:
+                chunk = file_obj.read(65536)
+                if not chunk:
+                    return
+                buffer += chunk
+                continue
+            if buffer[0] == "}":
+                return
+            if buffer[0] == ",":
+                buffer = buffer[1:]
+                continue
+            try:
+                key, end = decoder.raw_decode(buffer)
+            except json.JSONDecodeError:
+                chunk = file_obj.read(65536)
+                if not chunk:
+                    return
+                buffer += chunk
+                continue
+            buffer = buffer[end:]
+            buffer = buffer.lstrip()
+            if buffer.startswith(":"):
+                buffer = buffer[1:]
+            buffer = buffer.lstrip()
+            while True:
+                try:
+                    value, end = decoder.raw_decode(buffer)
+                    buffer = buffer[end:]
+                    yield key, value
+                    break
+                except json.JSONDecodeError:
+                    chunk = file_obj.read(65536)
+                    if not chunk:
+                        return
+                    buffer += chunk
+
+
+def render_stream(
+    input_path: str,
+    output_handle,
+    config_dict: Dict[str, Any],
+    filter_opts: Dict[str, Any],
+) -> None:
+    templates = {**config.DEFAULT_TEMPLATES, **config_dict.get("templates", {})}
+    options = config_dict.get("options", {})
+    if "skip_fields" not in options:
+        options = {**options, "skip_fields": ["story_id", "task_id", "dialog_id"]}
+    skip_fields = set(options.get("skip_fields", []))
+
+    def _tpl(key: str) -> Optional[str]:
+        tpl = templates.get(key)
+        if tpl is None:
+            return None
+        if isinstance(tpl, str) and tpl == "":
+            return None
+        if key in skip_fields:
+            return None
+        return tpl
+
+    decoder = json.JSONDecoder()
+    with open(input_path, "r", encoding="utf-8") as f:
+        info, buffer = _stream_find_object(f, "info", decoder)
+        if info is None:
+            return
+        chapter_num = replace_traveler(info.get("chapterNum", "") or "")
+        chapter_title = replace_traveler(info.get("chapterTitle", "") or "")
+        if chapter_title:
+            title_line = _tpl("chapter_title")
+            if title_line:
+                output_handle.write(
+                    title_line.format(
+                        chapter_num=chapter_num, chapter_title=chapter_title
+                    ).strip()
+                    + "\n"
+                )
+        elif chapter_num:
+            output_handle.write(f"# {chapter_num}\n")
+
+        chapter_desc_written = False
+        for _, story in _stream_story_entries(f, buffer, decoder):
+            if not isinstance(story, dict):
+                continue
+            if not chapter_desc_written:
+                desc = (story.get("info") or {}).get("description") or ""
+                desc = replace_traveler(desc)
+                if desc and _tpl("chapter_desc"):
+                    output_handle.write(_tpl("chapter_desc").format(chapter_desc=desc) + "\n")
+                chapter_desc_written = True
+
+            story_id = story.get("id")
+            story_steps = story.get("story") or {}
+            for step_key in sort_keys_numeric(story_steps.keys()):
+                step = story_steps.get(step_key, {})
+                task_id = step.get("id", step_key)
+                title = replace_traveler(step.get("title") or "")
+                step_desc = step.get("stepDescription")
+                step_desc = replace_traveler(step_desc) if step_desc else ""
+
+                task_data_list = step.get("taskData") or []
+                nodes: List[Dict[str, Any]] = []
+                for task in task_data_list:
+                    if task.get("taskType") != "resultDialogue":
+                        continue
+                    nodes.extend(build_dialog_nodes(task))
+
+                temp_doc = {
+                    "chapter_num": chapter_num,
+                    "chapter_title": chapter_title,
+                    "chapter_desc": "",
+                    "tasks": [
+                        {
+                            "story_id": story_id,
+                            "task_id": task_id,
+                            "title": title,
+                            "desc": step_desc,
+                            "nodes": nodes,
+                        }
+                    ],
+                }
+                filtered = filter_doc(temp_doc, filter_opts)
+                if not filtered.get("tasks"):
+                    continue
+                task = filtered["tasks"][0]
+
+                if task.get("story_id") and _tpl("story_id"):
+                    output_handle.write(
+                        _tpl("story_id").format(story_id=task["story_id"]) + "\n"
+                    )
+                if task.get("task_id") and _tpl("task_id"):
+                    output_handle.write(
+                        _tpl("task_id").format(task_id=task["task_id"]) + "\n"
+                    )
+
+                if task.get("title") and _tpl("task_title"):
+                    output_handle.write("\n")
+                    output_handle.write(
+                        _tpl("task_title").format(task_title=task["title"]) + "\n"
+                    )
+                if task.get("desc") and _tpl("task_desc"):
+                    output_handle.write(
+                        _tpl("task_desc").format(task_desc=task["desc"]) + "\n"
+                    )
+                if task.get("nodes"):
+                    lines = render_nodes_with_templates(
+                        task["nodes"], templates, options, 0
+                    )
+                    if lines:
+                        output_handle.write("\n".join(lines) + "\n")

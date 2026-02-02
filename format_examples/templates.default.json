@@ -10,12 +10,12 @@
     "dialog_line": "{role}：{text}",
     "dialog_cont": "    {text}",
     "branch_label": "【分支{index}】",
-    "black_screen": "*{text}*"
+    "black_screen": "**_{text}_**"
   },
   "options": {
     "indent_unit": "  ",
     "skip_fields": ["story_id", "task_id", "dialog_id"],
-    "filter_roles": [],
+    "filter_roles": ["旅行者"],
     "exclude_roles": [],
     "filter_keywords": [],
     "exclude_keywords": [],

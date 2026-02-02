@@ -33,7 +33,7 @@ def render(doc, options):
                 continue
             if node.get("is_black_screen"):
                 if "black_screen" not in skip_fields:
-                    lines.append(f"{prefix}*{node['text']}*")
+                    lines.append(f"{prefix}**_{node['text']}_**")
                 last_was_dialog = False
                 continue
             role = node.get("role", "")
