@@ -1,6 +1,6 @@
 # Genshin Impact Quest JSON to Markdown
 
-把任务剧情 JSON 转为 Markdown 的小脚本。
+Vibe Coding出来的一个将JSON格式的任务剧情转为 Markdown 的小脚本。
 > 请自行前往[安柏网](https://ambr.top/chs/archive/quest)获取剧情文本的 JSON 格式文件
 
 ## 功能
