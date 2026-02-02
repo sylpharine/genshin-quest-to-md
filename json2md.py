@@ -7,6 +7,10 @@ from typing import Any, Dict, List, Optional
 UNKNOWN_ROLE = "Unknown"
 TRAVELER_NAME = "旅行者"
 TRAVELER_GENDER = "F"
+WANDERER_NAME = "流浪者"
+SHOW_BRANCHES = True
+BRANCH_CHOICES = {}
+BRANCH_DEFAULT = 1
 
 
 def _sort_keys_numeric(keys):
@@ -57,18 +61,52 @@ def _replace_gender(text: str) -> str:
     return text
 
 
+def _parse_branch_choices(raw_list: List[str]) -> Dict[str, int]:
+    choices: Dict[str, int] = {}
+    for item in raw_list:
+        if not item:
+            continue
+        for part in item.split(","):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            key, value = part.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if not key or not value:
+                continue
+            try:
+                idx = int(value)
+            except ValueError:
+                continue
+            choices[key] = idx
+    return choices
+
+
+def _select_branch_index(dialog_id: str, total: int) -> int:
+    idx = BRANCH_CHOICES.get(str(dialog_id), BRANCH_DEFAULT)
+    if idx < 1:
+        idx = 1
+    if idx > total:
+        idx = total
+    return idx
+
+
 def _replace_traveler(text: str) -> str:
     if not text:
         return text
     if text.startswith("#") and (
         "{NICKNAME}" in text
         or "#{NICKNAME}" in text
+        or "REALNAME[" in text
         or "{M#" in text
         or "{F#" in text
     ):
         text = text[1:]
     text = _replace_gender(text)
-    for token in ("#{NICKNAME}", "{NICKNAME}", "Traveler", "玩家"):
+    text = re.sub(r"#\{REALNAME\[[^\]]*\]\}", WANDERER_NAME, text)
+    text = re.sub(r"\{REALNAME\[[^\]]*\]\}", WANDERER_NAME, text)
+    for token in ("#{NICKNAME}", "{NICKNAME}", "Traveler", "Traveller", "玩家"):
         text = text.replace(token, TRAVELER_NAME)
     return text
 
@@ -127,6 +165,52 @@ def _walk_dialog(
             return False
         next_text = _replace_traveler(next_entries[0].get("text", ""))
         return next_text == text_value
+
+    if not SHOW_BRANCHES and is_multi:
+        choice_index = _select_branch_index(current, len(dialog_entries))
+        text, next_id, is_black = dialog_entries[choice_index - 1]
+        output: List[Dict[str, Any]] = []
+        if _is_echo(next_id, role, text):
+            next_after_echo = None
+            next_dialog = items.get(str(next_id))
+            if next_dialog and next_dialog.get("type") == "SingleDialog":
+                next_entries = next_dialog.get("text") or []
+                next_ids = []
+                for entry in next_entries:
+                    nid = entry.get("next")
+                    if nid is not None and nid not in next_ids:
+                        next_ids.append(nid)
+                if len(next_ids) == 1:
+                    next_after_echo = next_ids[0]
+            if next_after_echo is not None:
+                output.append(
+                    {
+                        "type": "dialog",
+                        "indent": indent_level,
+                        "role": role,
+                        "text": text,
+                        "is_black_screen": is_black,
+                    }
+                )
+                output.extend(_walk_dialog(items, next_after_echo, indent_level, path))
+                return output
+            output.extend(_walk_dialog(items, next_id, indent_level, path))
+            return output
+        output.append(
+            {
+                "type": "dialog",
+                "indent": indent_level,
+                "role": role,
+                "text": text,
+                "is_black_screen": is_black,
+            }
+        )
+        if next_id is not None:
+            output.extend(_walk_dialog(items, next_id, indent_level, path))
+        return output
+
+    if not SHOW_BRANCHES and not is_multi:
+        branching = False
 
     output: List[Dict[str, Any]] = []
     if branching and is_multi and len(unique_next) == 1:
@@ -312,12 +396,34 @@ def main() -> None:
     parser.add_argument(
         "--traveler-name",
         default="旅行者",
-        help="Name to replace #{NICKNAME}/Traveler/玩家 (default: 旅行者)",
+        help="Name to replace #{NICKNAME}/Traveler/Traveller/玩家 (default: 旅行者)",
     )
     parser.add_argument(
         "--traveler-gender",
         default="F",
         help="Gender for {M#}{F#} placeholders: M or F (default: F)",
+    )
+    parser.add_argument(
+        "--wanderer-name",
+        default="流浪者",
+        help="Name to replace #{REALNAME[...]} placeholders (default: 流浪者)",
+    )
+    parser.add_argument(
+        "--hide-branches",
+        action="store_true",
+        help="Hide branches and select one path (default: show all branches)",
+    )
+    parser.add_argument(
+        "--branch-choice",
+        action="append",
+        default=[],
+        help="Branch choice mapping like 402231309-player=2 (repeatable, comma-separated)",
+    )
+    parser.add_argument(
+        "--branch-default",
+        type=int,
+        default=1,
+        help="Default branch index when branches are hidden (default: 1)",
     )
     args = parser.parse_args()
 
@@ -327,6 +433,14 @@ def main() -> None:
     TRAVELER_NAME = args.traveler_name
     global TRAVELER_GENDER
     TRAVELER_GENDER = _normalize_gender(args.traveler_gender)
+    global WANDERER_NAME
+    WANDERER_NAME = args.wanderer_name
+    global SHOW_BRANCHES
+    SHOW_BRANCHES = not args.hide_branches
+    global BRANCH_CHOICES
+    BRANCH_CHOICES = _parse_branch_choices(args.branch_choice)
+    global BRANCH_DEFAULT
+    BRANCH_DEFAULT = args.branch_default if args.branch_default >= 1 else 1
 
     with open(args.input, "r", encoding=args.encoding) as f:
         data = json.load(f)
