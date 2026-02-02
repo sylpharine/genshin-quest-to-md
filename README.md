@@ -103,9 +103,8 @@ def render(doc, options) -> str:
 - `nodes` 支持 `dialog` 和 `branch`
   - `dialog`: `{type, role, text, is_black_screen}`
   - `branch`: `{type, id, options}`，`options` 是多个节点列表
-```
 
-## 输出格式示例
+## 默认输出格式示例
 ```md
 # 奔霄颂玉轮 第二幕 《在岩间》
 章节描述...
