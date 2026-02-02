@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 UNKNOWN_ROLE = "Unknown"
 TRAVELER_NAME = "旅行者"
+TRAVELER_GENDER = "F"
 
 
 def _sort_keys_numeric(keys):
@@ -23,9 +25,49 @@ def _safe_role(role: Optional[str]) -> str:
     return role if role else UNKNOWN_ROLE
 
 
+def _normalize_gender(value: str) -> str:
+    if value is None:
+        return "F"
+    v = str(value).strip().lower()
+    if v in ("m", "male", "man", "男", "他"):
+        return "M"
+    if v in ("f", "female", "woman", "女", "她"):
+        return "F"
+    if v.upper() in ("M", "F"):
+        return v.upper()
+    return "F"
+
+
+def _replace_gender(text: str) -> str:
+    if not text:
+        return text
+
+    def repl_mf(match: re.Match) -> str:
+        male = match.group(1)
+        female = match.group(2)
+        return male if TRAVELER_GENDER == "M" else female
+
+    def repl_fm(match: re.Match) -> str:
+        female = match.group(1)
+        male = match.group(2)
+        return male if TRAVELER_GENDER == "M" else female
+
+    text = re.sub(r"\{M#([^}]*)\}\{F#([^}]*)\}", repl_mf, text)
+    text = re.sub(r"\{F#([^}]*)\}\{M#([^}]*)\}", repl_fm, text)
+    return text
+
+
 def _replace_traveler(text: str) -> str:
     if not text:
         return text
+    if text.startswith("#") and (
+        "{NICKNAME}" in text
+        or "#{NICKNAME}" in text
+        or "{M#" in text
+        or "{F#" in text
+    ):
+        text = text[1:]
+    text = _replace_gender(text)
     for token in ("#{NICKNAME}", "{NICKNAME}", "Traveller", "玩家"):
         text = text.replace(token, TRAVELER_NAME)
     return text
@@ -217,12 +259,19 @@ def main() -> None:
         default="旅行者",
         help="Name to replace #{NICKNAME}/Traveller/玩家 (default: 旅行者)",
     )
+    parser.add_argument(
+        "--traveler-gender",
+        default="F",
+        help="Gender for {M#}{F#} placeholders: M or F (default: F)",
+    )
     args = parser.parse_args()
 
     global UNKNOWN_ROLE
     UNKNOWN_ROLE = args.unknown_role
     global TRAVELER_NAME
     TRAVELER_NAME = args.traveler_name
+    global TRAVELER_GENDER
+    TRAVELER_GENDER = _normalize_gender(args.traveler_gender)
 
     with open(args.input, "r", encoding=args.encoding) as f:
         data = json.load(f)

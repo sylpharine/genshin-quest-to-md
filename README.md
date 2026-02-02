@@ -23,6 +23,7 @@ python3 json2md.py "在岩间.json" -o "在岩间.md"
 - `--encoding`：输入文件编码，默认 `utf-8`
 - `--unknown-role`：空角色名占位，默认 `Unknown`
 - `--traveler-name`：替换 `#{NICKNAME}` / `Traveller` / `玩家`，默认 `旅行者`
+- `--traveler-gender`：替换 `{M#}{F#}` 形式的性别占位，`M` 或 `F`，默认 `F`
 
 ## 示例
 ```bash
@@ -31,6 +32,9 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --traveler-name "荧"
 
 # 自定义未知角色占位
 python3 json2md.py "在岩间.json" -o "在岩间.md" --unknown-role "未知"
+
+# 自定义旅行者性别
+python3 json2md.py "在岩间.json" -o "在岩间.md" --traveler-gender "M"
 ```
 
 ## 输出格式示例
