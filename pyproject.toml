@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "pyyaml>=6.0",
+]
 
 [project.scripts]
 json2md = "genshhin_json_to_md.cli:main"

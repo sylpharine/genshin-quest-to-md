@@ -1,0 +1,41 @@
+# 模板区：控制输出格式（字符串为空则不渲染）
+templates:
+  # 章节标题与描述
+  chapter_title: "# {chapter_num} 《{chapter_title}》"
+  chapter_desc: "{chapter_desc}"
+
+  # 可选 ID 行（默认在 skip_fields 中隐藏）
+  story_id: "StoryID: {story_id}"
+  task_id: "TaskID: {task_id}"
+  dialog_id: "DialogID: {dialog_id}"
+
+  # 任务标题与描述
+  task_title: "## {task_title}"
+  task_desc: "{task_desc}"
+
+  # 对话行与续行
+  dialog_line: "{role}：{text}"
+  dialog_cont: "    {text}"
+
+  # 分支与黑屏文本
+  branch_label: "【分支{index}】"
+  black_screen: "**_{text}_**"
+
+# 选项区：控制渲染与过滤
+options:
+  # 缩进单位（默认两个空格）
+  indent_unit: "  "
+
+  # 不输出的字段（与 templates 字段名一致）
+  skip_fields:
+    - story_id
+    - task_id
+    - dialog_id
+
+  # 过滤器（留空表示不启用）
+  filter_roles: []        # 仅输出这些角色
+  exclude_roles: []       # 排除这些角色
+  filter_keywords: []     # 仅输出包含关键词的文本
+  exclude_keywords: []    # 排除包含关键词的文本
+  filter_tasks: []        # 仅输出标题包含关键词的任务
+  filter_ids: []          # 仅输出匹配 ID 前缀/范围的内容

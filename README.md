@@ -34,7 +34,7 @@ uv run json2md "在岩间.json" -o "在岩间.md"
 - `--hide-branches`：隐藏分支，只选择一条路径（默认展示所有分支）
 - `--branch-choice`：指定分支选择，如 `402231309-player=2`（可重复、可用逗号分隔）
 - `--branch-default`：隐藏分支时默认选择第几条，默认 `1`
-- `--format-file`：格式配置文件（JSON），支持模板或自定义渲染器
+- `--format-file`：格式配置文件（YAML），支持模板或自定义渲染器
 - `--filter-role`：仅输出指定角色的对话（可重复）
 - `--exclude-role`：排除指定角色的对话（可重复）
 - `--filter-keyword`：仅输出包含关键词的对话（可重复）
@@ -65,10 +65,10 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --wanderer-name "流浪者
 python3 json2md.py "在岩间.json" -o "在岩间.md" --hide-branches --branch-choice "402231309-player=2"
 
 # 使用模板配置文件
-python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/templates.default.json"
+python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/templates.default.yaml"
 
 # 使用自定义渲染器
-python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/renderer.novel.json"
+python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/renderer.novel.yaml"
 
 # 过滤示例：仅输出角色「钟离」且包含“月亮”的对话
 python3 json2md.py "在云间.json" -o "在云间.md" --filter-role "钟离" --filter-keyword "月亮"
@@ -79,7 +79,7 @@ python3 json2md.py "在云间.json" -o "在云间.md" --filter-task "前往"
 
 ## 自定义输出格式
 ### 模板模式（templates）
-`format_examples/templates.default.json` 是完整示例，你可以修改其中模板：
+`format_examples/templates.default.yaml` 是完整示例，你可以修改其中模板：
 - `chapter_title` / `chapter_desc`
 - `task_title` / `task_desc`
 - `dialog_line` / `dialog_cont`
@@ -98,7 +98,7 @@ ID 相关说明：
 - 范围匹配会按范围端点的位数对目标 ID 前缀进行比较（例如 `40223-40224` 会匹配 `4022301`）
 
 ### 渲染器模式（renderer）
-`format_examples/renderer.novel.json` 指定了一个 Python 渲染器：
+`format_examples/renderer.novel.yaml` 指定了一个 Python 渲染器：
 - `renderer`: `path/to/file.py:function`
 - `options`: 传给渲染器的参数
 

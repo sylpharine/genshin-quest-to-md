@@ -2,12 +2,15 @@ import importlib.util
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+try:
+    import yaml
+except ImportError as exc:  # pragma: no cover - runtime dependency check
+    raise ImportError("PyYAML is required for YAML config files. Install with uv/pip.") from exc
+
 
 def load_renderer(format_file: str) -> Tuple[str, Dict[str, Any]]:
-    import json
-
     with open(format_file, "r", encoding="utf-8") as f:
-        config = json.load(f)
+        config = yaml.safe_load(f) or {}
     renderer_spec = config.get("renderer")
     if not renderer_spec:
         return "templates", config
