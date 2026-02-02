@@ -11,6 +11,11 @@
   },
   "options": {
     "indent_unit": "  ",
-    "skip_fields": []
+    "skip_fields": [],
+    "filter_roles": [],
+    "exclude_roles": [],
+    "filter_keywords": [],
+    "exclude_keywords": [],
+    "filter_tasks": []
   }
 }

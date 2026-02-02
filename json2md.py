@@ -405,6 +405,88 @@ def _render_with_plugin(doc: Dict[str, Any], renderer_spec: str, config: Dict[st
     return str(func(doc, config.get("options", {})))
 
 
+def _match_any(text: str, keywords: List[str]) -> bool:
+    if not keywords:
+        return True
+    for kw in keywords:
+        if kw and kw in text:
+            return True
+    return False
+
+
+def _filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
+    role_include = options.get("filter_roles", []) or []
+    role_exclude = options.get("exclude_roles", []) or []
+    keyword_include = options.get("filter_keywords", []) or []
+    keyword_exclude = options.get("exclude_keywords", []) or []
+    task_filters = options.get("filter_tasks", []) or []
+
+    def task_match(title: str) -> bool:
+        if not task_filters:
+            return True
+        return _match_any(title, task_filters)
+
+    def node_match(node: Dict[str, Any]) -> bool:
+        if node["type"] == "branch":
+            return True
+        text = node.get("text", "") or ""
+        role = node.get("role", "") or ""
+        if role_exclude and role in role_exclude:
+            return False
+        if role_include and role not in role_include:
+            return False
+        if keyword_exclude and _match_any(text, keyword_exclude):
+            return False
+        if keyword_include and not _match_any(text, keyword_include):
+            return False
+        return True
+
+    def filter_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        filtered: List[Dict[str, Any]] = []
+        for node in nodes:
+            if node["type"] == "branch":
+                options_nodes = []
+                for option in node.get("options", []):
+                    option_filtered = filter_nodes(option)
+                    if option_filtered:
+                        options_nodes.append(option_filtered)
+                if options_nodes:
+                    filtered.append(
+                        {
+                            "type": "branch",
+                            "id": node.get("id"),
+                            "options": options_nodes,
+                        }
+                    )
+                continue
+            if node_match(node):
+                filtered.append(node)
+        return filtered
+
+    filtered_tasks = []
+    for task in doc.get("tasks", []):
+        title = task.get("title") or ""
+        if not task_match(title):
+            continue
+        nodes = filter_nodes(task.get("nodes", []))
+        if not nodes:
+            continue
+        filtered_tasks.append(
+            {
+                "title": task.get("title"),
+                "desc": task.get("desc"),
+                "nodes": nodes,
+            }
+        )
+
+    return {
+        "chapter_num": doc.get("chapter_num", ""),
+        "chapter_title": doc.get("chapter_title", ""),
+        "chapter_desc": doc.get("chapter_desc", ""),
+        "tasks": filtered_tasks,
+    }
+
+
 def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
     root = data.get("data", {})
     info = root.get("info", {})
@@ -502,6 +584,36 @@ def main() -> None:
         "--format-file",
         help="Path to JSON format config file (templates or renderer plugin)",
     )
+    parser.add_argument(
+        "--filter-role",
+        action="append",
+        default=[],
+        help="Only include dialog lines from specific role (repeatable)",
+    )
+    parser.add_argument(
+        "--exclude-role",
+        action="append",
+        default=[],
+        help="Exclude dialog lines from specific role (repeatable)",
+    )
+    parser.add_argument(
+        "--filter-keyword",
+        action="append",
+        default=[],
+        help="Only include dialog lines containing keyword (repeatable)",
+    )
+    parser.add_argument(
+        "--exclude-keyword",
+        action="append",
+        default=[],
+        help="Exclude dialog lines containing keyword (repeatable)",
+    )
+    parser.add_argument(
+        "--filter-task",
+        action="append",
+        default=[],
+        help="Only include tasks whose title contains keyword (repeatable)",
+    )
     args = parser.parse_args()
 
     global UNKNOWN_ROLE
@@ -523,13 +635,37 @@ def main() -> None:
         data = json.load(f)
 
     doc = json_to_doc(data)
+    cli_filter_opts = {
+        "filter_roles": args.filter_role,
+        "exclude_roles": args.exclude_role,
+        "filter_keywords": args.filter_keyword,
+        "exclude_keywords": args.exclude_keyword,
+        "filter_tasks": args.filter_task,
+    }
     if args.format_file:
         renderer_spec, cfg = _load_renderer(args.format_file)
+        if "options" not in cfg:
+            cfg["options"] = {}
+        filter_opts = {
+            "filter_roles": cfg["options"].get("filter_roles", []),
+            "exclude_roles": cfg["options"].get("exclude_roles", []),
+            "filter_keywords": cfg["options"].get("filter_keywords", []),
+            "exclude_keywords": cfg["options"].get("exclude_keywords", []),
+            "filter_tasks": cfg["options"].get("filter_tasks", []),
+        }
+        for key, value in cli_filter_opts.items():
+            if value:
+                filter_opts[key] = value
+        doc = _filter_doc(doc, filter_opts)
+        for key, value in filter_opts.items():
+            if value:
+                cfg["options"][key] = value
         if renderer_spec == "templates":
             md = _render_with_templates(doc, cfg)
         else:
             md = _render_with_plugin(doc, renderer_spec, cfg)
     else:
+        doc = _filter_doc(doc, cli_filter_opts)
         md = _render_with_templates(doc, {})
 
     if args.output:

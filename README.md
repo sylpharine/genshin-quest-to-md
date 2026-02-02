@@ -30,6 +30,11 @@ python3 json2md.py "在岩间.json" -o "在岩间.md"
 - `--branch-choice`：指定分支选择，如 `402231309-player=2`（可重复、可用逗号分隔）
 - `--branch-default`：隐藏分支时默认选择第几条，默认 `1`
 - `--format-file`：格式配置文件（JSON），支持模板或自定义渲染器
+- `--filter-role`：仅输出指定角色的对话（可重复）
+- `--exclude-role`：排除指定角色的对话（可重复）
+- `--filter-keyword`：仅输出包含关键词的对话（可重复）
+- `--exclude-keyword`：排除包含关键词的对话（可重复）
+- `--filter-task`：仅输出任务标题包含关键词的任务（可重复）
 
 ## 示例
 ```bash
@@ -54,6 +59,12 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_exam
 # 使用自定义渲染器
 python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_examples/renderer.novel.json"
 
+# 过滤示例：仅输出角色「钟离」且包含“月亮”的对话
+python3 json2md.py "在云间.json" -o "在云间.md" --filter-role "钟离" --filter-keyword "月亮"
+
+# 过滤示例：仅输出任务标题包含“前往”的任务
+python3 json2md.py "在云间.json" -o "在云间.md" --filter-task "前往"
+
 ## 自定义输出格式
 ### 模板模式（templates）
 `format_examples/templates.default.json` 是完整示例，你可以修改其中模板：
@@ -65,6 +76,7 @@ python3 json2md.py "在岩间.json" -o "在岩间.md" --format-file "format_exam
 
 模板可用变量示例：`{chapter_num}`, `{chapter_title}`, `{task_title}`, `{role}`, `{text}`, `{index}`。
 你可以通过 `options.skip_fields` 禁用指定字段渲染，或将模板值设为空字符串。
+你也可以在 `options` 中配置过滤器：`filter_roles` / `exclude_roles` / `filter_keywords` / `exclude_keywords` / `filter_tasks`。
 
 ### 渲染器模式（renderer）
 `format_examples/renderer.novel.json` 指定了一个 Python 渲染器：
