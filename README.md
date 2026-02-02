@@ -65,6 +65,7 @@ python3 json2md.py "在云间.json" -o "在云间.md" --filter-role "钟离" --f
 
 # 过滤示例：仅输出任务标题包含“前往”的任务
 python3 json2md.py "在云间.json" -o "在云间.md" --filter-task "前往"
+```
 
 ## 自定义输出格式
 ### 模板模式（templates）
@@ -118,5 +119,5 @@ def render(doc, options) -> str:
   角色：对白
 【分支2】
   角色：对白
-后续公共对白...
+...
 ```
