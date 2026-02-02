@@ -68,7 +68,7 @@ def _replace_traveler(text: str) -> str:
     ):
         text = text[1:]
     text = _replace_gender(text)
-    for token in ("#{NICKNAME}", "{NICKNAME}", "Traveller", "玩家"):
+    for token in ("#{NICKNAME}", "{NICKNAME}", "Traveler", "玩家"):
         text = text.replace(token, TRAVELER_NAME)
     return text
 
@@ -257,7 +257,7 @@ def main() -> None:
     parser.add_argument(
         "--traveler-name",
         default="旅行者",
-        help="Name to replace #{NICKNAME}/Traveller/玩家 (default: 旅行者)",
+        help="Name to replace #{NICKNAME}/Traveler/玩家 (default: 旅行者)",
     )
     parser.add_argument(
         "--traveler-gender",
