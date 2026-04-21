@@ -4,14 +4,16 @@ templates:
   chapter_title: "# {chapter_num} 《{chapter_title}》"
   chapter_desc: "{chapter_desc}"
 
+  # Story / Task 标题与描述
+  story_title: "## {story_title}"
+  story_desc: "{story_desc}"
+  task_title: "### {task_title}"
+  task_desc: "{task_desc}"
+
   # 可选 ID 行（默认在 skip_fields 中隐藏）
   story_id: "StoryID: {story_id}"
   task_id: "TaskID: {task_id}"
   dialog_id: "DialogID: {dialog_id}"
-
-  # 任务标题与描述
-  task_title: "## {task_title}"
-  task_desc: "{task_desc}"
 
   # 对话行与续行
   dialog_line: "{role}：{text}"

@@ -139,6 +139,8 @@ def filter_doc(doc: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
         filtered_tasks.append(
             {
                 "story_id": story_id,
+                "story_title": task.get("story_title"),
+                "story_desc": task.get("story_desc"),
                 "task_id": task_id,
                 "title": task.get("title"),
                 "desc": task.get("desc"),

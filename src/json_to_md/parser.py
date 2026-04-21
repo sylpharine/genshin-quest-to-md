@@ -172,16 +172,14 @@ def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
     info = root.get("info", {})
     chapter_num = replace_traveler(info.get("chapterNum", "") or "")
     chapter_title = replace_traveler(info.get("chapterTitle", "") or "")
-    chapter_desc = ""
+    chapter_desc = replace_traveler(
+        info.get("chapterDesc")
+        or info.get("description")
+        or ""
+    )
 
     story_list = root.get("storyList") or {}
     story_keys = sort_keys_numeric(story_list.keys())
-
-    if story_keys:
-        first_story = story_list.get(story_keys[0], {})
-        chapter_desc = replace_traveler(
-            (first_story.get("info") or {}).get("description") or ""
-        )
 
     doc: Dict[str, Any] = {
         "chapter_num": chapter_num,
@@ -193,6 +191,9 @@ def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
     for story_key in story_keys:
         story = story_list.get(story_key, {})
         story_id = story.get("id", story_key)
+        story_info = story.get("info") or {}
+        story_title = replace_traveler(story_info.get("title") or "")
+        story_desc = replace_traveler(story_info.get("description") or "")
         story_steps = story.get("story") or {}
         for step_key in sort_keys_numeric(story_steps.keys()):
             step = story_steps.get(step_key, {})
@@ -211,6 +212,8 @@ def json_to_doc(data: Dict[str, Any]) -> Dict[str, Any]:
             doc["tasks"].append(
                 {
                     "story_id": story_id,
+                    "story_title": story_title,
+                    "story_desc": story_desc,
                     "task_id": task_id,
                     "title": title,
                     "desc": step_desc,

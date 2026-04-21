@@ -130,6 +130,11 @@ def render_stream(
             return
         chapter_num = replace_traveler(info.get("chapterNum", "") or "")
         chapter_title = replace_traveler(info.get("chapterTitle", "") or "")
+        chapter_desc = replace_traveler(
+            info.get("chapterDesc")
+            or info.get("description")
+            or ""
+        )
         if chapter_title:
             title_line = _fmt(
                 "chapter_title",
@@ -141,20 +146,20 @@ def render_stream(
         elif chapter_num and _tpl("chapter_title"):
             output_handle.write(f"# {chapter_num}\n")
 
-        chapter_desc_written = False
+        if chapter_desc:
+            desc_line = _fmt("chapter_desc", chapter_desc=chapter_desc)
+            if desc_line:
+                output_handle.write(desc_line + "\n")
+
         for _, story in _stream_story_entries(f, buffer, decoder):
             if not isinstance(story, dict):
                 continue
-            if not chapter_desc_written:
-                desc = (story.get("info") or {}).get("description") or ""
-                desc = replace_traveler(desc)
-                if desc:
-                    desc_line = _fmt("chapter_desc", chapter_desc=desc)
-                    if desc_line:
-                        output_handle.write(desc_line + "\n")
-                chapter_desc_written = True
 
             story_id = story.get("id")
+            story_info = story.get("info") or {}
+            story_title = replace_traveler(story_info.get("title") or "")
+            story_desc = replace_traveler(story_info.get("description") or "")
+            story_emitted = False
             story_steps = story.get("story") or {}
             for step_key in sort_keys_numeric(story_steps.keys()):
                 step = story_steps.get(step_key, {})
@@ -177,6 +182,8 @@ def render_stream(
                     "tasks": [
                         {
                             "story_id": story_id,
+                            "story_title": story_title,
+                            "story_desc": story_desc,
                             "task_id": task_id,
                             "title": title,
                             "desc": step_desc,
@@ -189,10 +196,20 @@ def render_stream(
                     continue
                 task = filtered["tasks"][0]
 
-                if task.get("story_id"):
-                    story_line = _fmt("story_id", story_id=task["story_id"])
-                    if story_line:
-                        output_handle.write(story_line + "\n")
+                if not story_emitted:
+                    if task.get("story_id"):
+                        story_line = _fmt("story_id", story_id=task["story_id"])
+                        if story_line:
+                            output_handle.write(story_line + "\n")
+                    if task.get("story_title") and _tpl("story_title"):
+                        title_line = _fmt("story_title", story_title=task["story_title"])
+                        if title_line:
+                            output_handle.write("\n" + title_line + "\n")
+                    if task.get("story_desc"):
+                        desc_line = _fmt("story_desc", story_desc=task["story_desc"])
+                        if desc_line:
+                            output_handle.write(desc_line + "\n")
+                    story_emitted = True
                 if task.get("task_id"):
                     task_line = _fmt("task_id", task_id=task["task_id"])
                     if task_line:

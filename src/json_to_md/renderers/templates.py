@@ -52,6 +52,8 @@ def normalize_templates_config(
         "chapter_title",
         "chapter_desc",
         "story_id",
+        "story_title",
+        "story_desc",
         "task_id",
         "task_title",
         "task_desc",
@@ -188,13 +190,29 @@ def render_with_templates(doc: Dict[str, Any], config_dict: Dict[str, Any]) -> s
         if chapter_desc_line:
             lines.append(chapter_desc_line)
 
+    last_story_marker = None
     for task in doc.get("tasks", []):
         story_id = task.get("story_id", "")
+        story_title = task.get("story_title") or ""
+        story_desc = task.get("story_desc") or ""
+        story_marker = (story_id, story_title, story_desc)
+        if story_marker != last_story_marker:
+            if story_id:
+                story_line = _fmt("story_id", story_id=story_id)
+                if story_line:
+                    lines.append(story_line)
+            if story_title and _tpl("story_title"):
+                lines.append("")
+                story_title_line = _fmt("story_title", story_title=story_title)
+                if story_title_line:
+                    lines.append(story_title_line)
+            if story_desc:
+                story_desc_line = _fmt("story_desc", story_desc=story_desc)
+                if story_desc_line:
+                    lines.append(story_desc_line)
+            last_story_marker = story_marker
+
         task_id = task.get("task_id", "")
-        if story_id:
-            story_line = _fmt("story_id", story_id=story_id)
-            if story_line:
-                lines.append(story_line)
         if task_id:
             task_line = _fmt("task_id", task_id=task_id)
             if task_line:

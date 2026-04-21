@@ -52,15 +52,22 @@ def render(doc, options):
                 last_indent = indent
                 last_was_dialog = True
 
+    last_story_id = None
     for task in doc.get("tasks", []):
         story_id = task.get("story_id")
+        if story_id != last_story_id:
+            if story_id and "story_id" not in skip_fields:
+                lines.append(story_id_fmt.format(story_id=story_id))
+            if task.get("story_title") and "story_title" not in skip_fields:
+                lines.append("\n## " + task["story_title"])
+            if task.get("story_desc") and "story_desc" not in skip_fields:
+                lines.append(task["story_desc"])
+            last_story_id = story_id
         task_id = task.get("task_id")
-        if story_id and "story_id" not in skip_fields:
-            lines.append(story_id_fmt.format(story_id=story_id))
         if task_id and "task_id" not in skip_fields:
             lines.append(task_id_fmt.format(task_id=task_id))
         if task.get("title") and "task_title" not in skip_fields:
-            lines.append("\n## " + task["title"])
+            lines.append("\n### " + task["title"])
         if task.get("desc") and "task_desc" not in skip_fields:
             lines.append(task["desc"])
         render_nodes(task.get("nodes", []))
