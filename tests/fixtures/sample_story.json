@@ -1,0 +1,248 @@
+{
+  "response": 200,
+  "data": {
+    "info": {
+      "id": 99999,
+      "type": "wq",
+      "chapterNum": "测试篇·第一幕",
+      "chapterTitle": "风息样例",
+      "chapterIcon": "UI_ChapterIcon_Test",
+      "chapterImageTitle": "",
+      "route": "Sample Story",
+      "chapterCount": 1
+    },
+    "storyList": {
+      "0": {
+        "id": 91001,
+        "info": {
+          "title": "风停了",
+          "description": "风息山上有一座废弃的疗养院，这是一段用于回归测试的样例剧情。"
+        },
+        "reward": {},
+        "suggestTrackMainQuestList": {},
+        "story": {
+          "0": {
+            "id": 9100101,
+            "isHidden": false,
+            "title": "进入疗养院",
+            "stepDescription": "用于验证 story 标题、story 描述和普通单线对话输出。",
+            "taskData": [
+              {
+                "isAuto": true,
+                "condType": "QUEST_CONTENT_FINISH_PLOT",
+                "taskType": "resultDialogue",
+                "initDialog": 910010101,
+                "items": {
+                  "910010101": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "伊斯托利亚",
+                    "text": [
+                      {
+                        "text": "你们终于来了，我还以为这里又只剩风声了。",
+                        "next": 910010102
+                      }
+                    ]
+                  },
+                  "910010102": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "派蒙",
+                    "text": [
+                      {
+                        "text": "这里看起来怪阴森的，不过我们是来帮忙的。",
+                        "next": 910010103
+                      }
+                    ]
+                  },
+                  "910010103": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "主角",
+                    "text": [
+                      {
+                        "text": "先告诉我发生了什么。",
+                        "next": "finish"
+                      }
+                    ]
+                  }
+                },
+                "beginLogic": null,
+                "beginCond": [
+                  {
+                    "id": 910019001,
+                    "description": "与伊斯托利亚对话",
+                    "condition": "taskStarted"
+                  }
+                ]
+              }
+            ]
+          },
+          "1": {
+            "id": 9100102,
+            "isHidden": false,
+            "title": "确认走廊异状",
+            "stepDescription": "用于验证 MultiDialog 分支、黑屏文本和公共后续剧情合并。",
+            "taskData": [
+              {
+                "isAuto": false,
+                "condType": "QUEST_CONTENT_COMPLETE_TALK",
+                "taskType": "resultDialogue",
+                "initDialog": 910010201,
+                "items": {
+                  "910010201": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "派蒙",
+                    "text": [
+                      {
+                        "text": "前面那扇门后面好像有动静。",
+                        "next": "910010201-player"
+                      }
+                    ]
+                  },
+                  "910010201-player": {
+                    "type": "MultiDialog",
+                    "role": "？？？",
+                    "text": [
+                      {
+                        "text": "先打招呼。",
+                        "next": 910010202
+                      },
+                      {
+                        "text": "先观察一下。",
+                        "next": 910010203
+                      }
+                    ]
+                  },
+                  "910010202": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "主角",
+                    "text": [
+                      {
+                        "text": "里面有人吗？",
+                        "next": 910010204
+                      }
+                    ]
+                  },
+                  "910010203": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "主角",
+                    "text": [
+                      {
+                        "text": "先别出声，我想听清楚一点。",
+                        "next": 910010204
+                      }
+                    ]
+                  },
+                  "910010204": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": true,
+                    "role": "？？？",
+                    "text": [
+                      {
+                        "text": "一阵风穿过空荡的走廊，旧门轻轻合上。",
+                        "next": 910010205
+                      }
+                    ]
+                  },
+                  "910010205": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "伊斯托利亚",
+                    "text": [
+                      {
+                        "text": "别紧张，只是年久失修。继续往前吧。",
+                        "next": "finish"
+                      }
+                    ]
+                  }
+                },
+                "beginLogic": null,
+                "beginCond": [
+                  {
+                    "id": 910019002,
+                    "description": "调查走廊",
+                    "condition": "taskStarted"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "npcList": null
+      },
+      "1": {
+        "id": 91002,
+        "info": {
+          "title": "未寄出的信",
+          "description": "第二个 story 用来验证 story 切换时标题和描述会重新输出，而不是只输出第一段。"
+        },
+        "reward": {},
+        "suggestTrackMainQuestList": {},
+        "story": {
+          "0": {
+            "id": 9100201,
+            "isHidden": false,
+            "title": "翻找诊室",
+            "stepDescription": "用于验证同一文件中多个 story 连续渲染。",
+            "taskData": [
+              {
+                "isAuto": true,
+                "condType": "QUEST_CONTENT_FINISH_PLOT",
+                "taskType": "resultDialogue",
+                "initDialog": 910020101,
+                "items": {
+                  "910020101": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "彩特琳德",
+                    "text": [
+                      {
+                        "text": "这里有一封没寄出的信，落款已经模糊了。",
+                        "next": 910020102
+                      }
+                    ]
+                  },
+                  "910020102": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "派蒙",
+                    "text": [
+                      {
+                        "text": "至少说明这里的人当时还想和外面联系。",
+                        "next": 910020103
+                      }
+                    ]
+                  },
+                  "910020103": {
+                    "type": "SingleDialog",
+                    "isBlackScreen": false,
+                    "role": "主角",
+                    "text": [
+                      {
+                        "text": "把它收好，也许后面用得上。",
+                        "next": "finish"
+                      }
+                    ]
+                  }
+                },
+                "beginLogic": null,
+                "beginCond": [
+                  {
+                    "id": 910029001,
+                    "description": "检查诊室",
+                    "condition": "taskStarted"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "npcList": null
+      }
+    }
+  }
+}
