@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument(
         "--traveler-name",
         default="旅行者",
-        help="Name to replace #{NICKNAME}/Traveler/Traveller/玩家 (default: 旅行者)",
+        help="Name to replace #{NICKNAME}/Traveler/Traveller/玩家 and role 主角 (default: 旅行者)",
     )
     parser.add_argument(
         "--traveler-gender",

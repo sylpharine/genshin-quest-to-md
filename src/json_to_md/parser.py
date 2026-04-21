@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import config
-from .placeholders import replace_traveler, safe_role
+from .placeholders import replace_role_name, replace_traveler
 
 
 def sort_keys_numeric(keys):
@@ -59,7 +59,7 @@ def build_dialog_nodes(task: Dict[str, Any]) -> List[Dict[str, Any]]:
 
         path.add(current)
 
-        role = replace_traveler(safe_role(dialog.get("role", "")))
+        role = replace_role_name(dialog.get("role", ""))
         text_entries = dialog.get("text") or []
         is_black_screen = bool(dialog.get("isBlackScreen", False))
         dialog_entries: List[Tuple[str, Any]] = []
@@ -86,7 +86,7 @@ def build_dialog_nodes(task: Dict[str, Any]) -> List[Dict[str, Any]]:
             next_dialog = items.get(str(next_id))
             if not next_dialog or next_dialog.get("type") != "SingleDialog":
                 return False
-            next_role = replace_traveler(safe_role(next_dialog.get("role", "")))
+            next_role = replace_role_name(next_dialog.get("role", ""))
             if next_role != role_name:
                 return False
             next_entries = next_dialog.get("text") or []

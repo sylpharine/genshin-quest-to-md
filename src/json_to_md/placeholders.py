@@ -58,3 +58,11 @@ def replace_traveler(text: str) -> str:
     for token in ("#{NICKNAME}", "{NICKNAME}", "Traveler", "Traveller", "玩家"):
         text = text.replace(token, config.TRAVELER_NAME)
     return text
+
+
+def replace_role_name(role: str) -> str:
+    role = safe_role(role)
+    role = replace_traveler(role)
+    if role == "主角":
+        return config.TRAVELER_NAME
+    return role

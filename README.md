@@ -29,7 +29,7 @@ uv run json2md "在岩间.json" -o "在岩间.md"
 - `-o, --output`：输出 Markdown 文件路径（不传则输出到 stdout）
 - `--encoding`：输入文件编码，默认 `utf-8`
 - `--unknown-role`：空角色名占位，默认 `Unknown`
-- `--traveler-name`：替换 `#{NICKNAME}` / `Traveler` / `Traveller` / `玩家`，默认 `旅行者`
+- `--traveler-name`：替换 `#{NICKNAME}` / `Traveler` / `Traveller` / `玩家`，并将角色名 `主角` 替换为旅行者名，默认 `旅行者`
 - `--traveler-gender`：替换 `{M#}{F#}` 形式的性别占位，`M` 或 `F`，默认 `F`
 - `--wanderer-name`：替换 `#{REALNAME[...]}` 占位，默认 `流浪者`
 - `--hide-branches`：隐藏分支，只选择一条路径（默认展示所有分支）
